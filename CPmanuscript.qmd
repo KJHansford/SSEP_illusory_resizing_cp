@@ -107,7 +107,7 @@ if (!file.exists('local/Allfspec.npy')){
 if (!file.exists('local/amplitudes.npy')){
   osfproject <- osf_retrieve_node("dr3ts")
   osffiles <- osf_ls_files(osfproject)
-  fid <- which(osffiles$name=='amplitudes1.npy')
+  fid <- which(osffiles$name=='amplitudes.npy')
   osf_download(osffiles[fid,], path='local/',progress=TRUE)
 }
 
