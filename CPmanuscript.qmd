@@ -1,0 +1,2010 @@
+---
+title: "Somatosensory Response Changes During Illusory Finger Stretching in Participants with Chronic Hand-Based Pain"
+author: ""
+bibliography: cp_references.bib
+csl: elife.csl
+output:
+  bookdown::pdf_document2:
+    fig_caption: yes
+    toc: no
+    keep_tex: true
+execute: 
+  echo: false
+  include: false
+  output: false
+format: 
+  pdf:
+    fig-pos: "H"
+---
+
+```{r setup, include=FALSE}
+
+processdata <- 0
+# the processdata flag has two levels:
+# 0 - just produce the manuscript and all analyses and figures from processed EEG data
+# 1 - do all analyses from scratch using the raw EEG data
+
+
+# install R packages
+packagelist <- c('tidyverse','ggpubr','ez','ggplot2','jpeg','grid','plotrix','lavaan', 'cowplot', 'ggpubr','rstatix','reticulate','moments','tiff','rmarkdown','tinytex','osfr')  
+missingpackages <- packagelist[!packagelist %in% installed.packages()[,1]]
+if (length(missingpackages)>0){install.packages(missingpackages)}
+toinstall <- packagelist[which(!packagelist %in% (.packages()))]
+invisible(lapply(toinstall,library,character.only=TRUE))
+
+# if (!is_tinytex()){install_tinytex()}
+
+# create python environment and install packages
+  install_miniconda()
+  use_miniconda('r-reticulate')
+  py_install(c('numpy'))
+  if (processdata==1){
+  py_install(c('mne', 'pandas', 'openpyxl'))
+  }
+
+# check for local files and directories and create/download if missing
+if (!dir.exists('local')){dir.create('local')}
+
+figdir <- 'Figures/'
+if (!dir.exists(figdir)){dir.create(figdir)}
+
+if (processdata==1){
+  if (!dir.exists('local/EEG Data')){dir.create('local/EEG Data')}
+}
+
+if (processdata==1){
+    for (subj in 1:21){
+    if (!dir.exists(paste0('local/EEG Data/CP',subj))){dir.create(paste0('local/EEG Data/CP',subj))}
+  }
+  osfproject <- osf_retrieve_node("kmhft")
+  osffiles <- osf_ls_files(osfproject,n_max=100)
+  for (subj in 1:21){
+    if (!file.exists(paste0('local/EEG Data/CP',subj,'/CP',subj,'_block1_EEG.fdt'))){
+    fid <- which(osffiles$name==paste0('CP',subj,'_block1_EEG.fdt'))
+    osf_download(osffiles[fid,], path=paste0('local/EEG Data/CP',subj),progress=TRUE,conflicts='overwrite')
+    }
+    if (!file.exists(paste0('local/EEG Data/CP',subj,'/CP',subj,'_block1_EEG.set'))){
+    fid <- which(osffiles$name==paste0('CP',subj,'_block1_EEG.set'))
+    osf_download(osffiles[fid,], path=paste0('local/EEG Data/CP',subj),progress=TRUE)
+}}}
+
+
+if (!file.exists('local/subjective data.csv')){
+  osfproject <- osf_retrieve_node("ry5fs")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='subjective data.csv')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('local/pain data.csv')){
+  osfproject <- osf_retrieve_node("ry5fs")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='pain data.csv')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('local/handedness.csv')){
+  osfproject <- osf_retrieve_node("ry5fs")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='handedness.csv')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('local/demographics.csv')){
+  osfproject <- osf_retrieve_node("ry5fs")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='demographics.csv')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('local/Allfspec.npy')){
+  osfproject <- osf_retrieve_node("dr3ts")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='Allfspec.npy')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('local/amplitudes.npy')){
+  osfproject <- osf_retrieve_node("dr3ts")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='amplitudes1.npy')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+
+if (!file.exists('local/channames.npy')){
+  osfproject <- osf_retrieve_node("dr3ts")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='channames.npy')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+
+if (!file.exists('cp_references.bib')){
+  osfproject <- osf_retrieve_node("sjvua")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='references-rr.bib')
+  osf_download(osffiles[fid,], progress=TRUE)
+}
+
+if (!file.exists('local/montage.csv')){
+  osfproject <- osf_retrieve_node("sjvua")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='montage.csv')
+  osf_download(osffiles[fid,], path='local/',progress=TRUE)
+}
+
+if (!file.exists('Figures/Augmented Reality System.png')){
+  osfproject <- osf_retrieve_node("sjvua")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='Augmented Reality System.png')
+  osf_download(osffiles[fid,], path='Figures/',progress=TRUE)
+}
+
+if (!file.exists('Figures/Conditions.png')){
+  osfproject <- osf_retrieve_node("sjvua")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='Conditions.png')
+  osf_download(osffiles[fid,], path='Figures/',progress=TRUE)
+}
+
+if (!file.exists('Figures/Pilot Data.png')){
+  osfproject <- osf_retrieve_node("wfu7j")
+  osffiles <- osf_ls_files(osfproject)
+  fid <- which(osffiles$name=='Pilot Data.png')
+  osf_download(osffiles[fid,], path='Figures/',progress=TRUE)
+}
+
+```
+
+```{python SEremoval, include=FALSE}
+
+# code to import raw EEG data and process
+if r.processdata==1:
+
+  import os
+  # os.system('python3 -m pip install mne numpy scikit-learn matplotlib pandas openpyxl')
+  import mne
+  import math
+  import numpy as np
+  import pandas as pd
+  import matplotlib.pyplot as plt
+
+  #Suppress console output from MNE (as this gives a lot of output)
+  mne.set_log_level('ERROR')
+
+  ## Directories ##
+
+  #Sets base data directory
+  datadir = "local/EEG data/"
+  outDir = "local/"
+
+  ## Begin ##
+
+  #make zeros arrays for ses to be placed in 
+  allses = np.zeros([21,96,62])
+
+  #Set up a dictionary to record participants with erronious numbers of trials. 
+  errorDict = {}
+  participantList = []
+
+  print('Reading subject...')
+
+  #22 = 21Ps because python
+  for subjectno in range(1,22):
+    #load in subject data  
+    subject = (f'CP{subjectno}')
+    print(f'CP{subjectno}', end = ' ')
+    participantList.append(f'CP{subjectno}')
+    
+    #Read in data    
+    raw_fname = os.path.join(datadir, subject, f'{subject}_block1_EEG.set')
+    raw = mne.io.read_raw_eeglab(raw_fname,preload=True)
+    
+    #load in EEG montage
+    ANT_montage = mne.channels.make_standard_montage("standard_1020")
+    raw.drop_channels(["HEOG", "VEOG", "M1", "M2"])
+    raw.set_montage(ANT_montage)
+    
+    #Apply 50Hz notch filter
+    #filtered = raw.filter(0.2,40)
+    filtered = raw.copy().notch_filter(freqs=50)
+    
+    #extract triggers
+    events, event_id = mne.events_from_annotations(filtered)
+    
+    #Get electrode list
+    ch_names = raw.ch_names
+    
+    #set condition triggers
+    legaltriggers = [10,20,30,40]
+    
+    #make variable for exracted values
+    extracted_values = []
+    
+    #use condition triggers as event triggers
+    for trigger in legaltriggers:
+        trigger_str = str(trigger)
+        if trigger_str in event_id:
+            extracted_values.append(event_id[trigger_str])
+    
+    #define event labels for each condition based on extracted values
+    event_dict = {
+            "NI": extracted_values[0],
+            "NIT": extracted_values[1],
+            "MS": extracted_values[2],
+            "UV": extracted_values[3]
+    }
+    
+    #Set rejection criteria
+    reject_criteria = None   #dict(eeg=200e-6)
+    
+    #epoch data
+    allepochs = mne.Epochs(filtered, events, event_id=event_dict, tmin=0.4,
+                           tmax=2.4, baseline=(0.4,2.4), reject=reject_criteria, 
+                           preload=True)
+   
+        #get trial data from epochs
+    trials = allepochs.get_data()*1000000
+    allses[subjectno-1,0:len(allepochs),0:62] = np.std(trials,axis=2)/np.sqrt(2001)
+      
+
+  #get mean ses from allses
+  meanses = np.mean(allses,axis=1)
+
+  #if a value is 0 make it nan
+  meanses[meanses==0] = np.nan
+
+  #concatenate the means ses into a vector
+  sesvect = np.concatenate(meanses)
+  #remove nan values
+  sesvect = sesvect[~np.isnan(sesvect)]
+  #sort in ascending order
+  sesvect.sort()
+  #create threshold of top 5% of values
+  thd = sesvect[round(len(sesvect)*0.95)]
+  #see threshold value
+  thd
+
+  #Create a dataframe from meanses 
+  meansesDf = pd.DataFrame(meanses)
+  meansesDf.insert(0, 'Participant', participantList)
+
+  #Creates a dictionary where key = electrode number, value = electrode name
+  electrodeDict = {}
+  for num, electrode in enumerate(ch_names):
+    electrodeDict[num] = electrode
+
+  #Sets up a participant dictionary and loops over participants
+  pDict = {}
+  for participant in range(len(meanses)):
+    
+    #Sets up an electrode list and loops over electrodes
+    eList = []  
+    for electrode in range(len(ch_names)):
+  
+        #If means exceed threshhold or are nan, add electrode number to the
+        #list. 
+        if meanses[participant, electrode] > thd:      
+            eList.append(electrode)
+        elif math.isnan(meanses[participant, electrode]):
+            eList.append(electrode)
+    
+    #Add over threshhold list to dictionary under participant key
+    pDict[f'CP{participant+1}'] = eList
+
+  #Convert dictionary to a dataframe and replace all values according to key into
+  #values established in the electrodeDict dictionary. 
+  electrodeDf = pd.DataFrame.from_dict(pDict, orient='index')
+  electrodeDf = electrodeDf.replace(electrodeDict)
+  electrodeDf.insert(0, 'Participant', participantList)
+
+  #Save output to spreadsheet
+  with pd.ExcelWriter(os.path.join(outDir, 'Electrodes.xlsx')) as writer:
+                    meansesDf.to_excel(writer, sheet_name = 'Mean SES', 
+                                       index = False)
+                    electrodeDf.to_excel(writer, sheet_name = 'Over Thresh', 
+                                         index = False)
+  electrodeDf.to_csv(os.path.join(outDir, 'Electrodes.csv'), index = False)
+  meansesDf.to_csv(os.path.join(outDir, 'Meanses.csv'), index = False)
+    
+
+```
+
+```{python amplitudes, include=FALSE}
+
+if r.processdata==1:
+  # code to get SSEP amplitudes for analysis
+  
+  #Suppress console output from MNE (as this gives a lot of output)
+  mne.set_log_level('ERROR')
+  
+  ## Begin ##
+  
+  #Set up a dictionary to record participants with erronious numbers of trials. 
+  errorDict = {}
+  participantList = []
+
+  #make zeros arrays for amplitudes and ses's to be placed in 
+  amplitudes = np.zeros([21,4])
+  subjectcount = -1
+  #subjectno = 31
+
+  #make matrix to store fourier spectrum in
+  allfspec = np.empty([21,4,62,1001],dtype = complex)
+
+  print('Reading subject...')
+
+  for subjectno in range(1,22):
+    
+    subject = (f'CP{subjectno}')
+    
+    #only analyse data if more than 32 electrodes are available    
+    thrCount = meanses[subjectno-1,0:62] > thd
+    if thrCount.sum() < 32:
+           
+        print(f'CP{subjectno}', end = ' ')
+        
+        raw_fname = os.path.join(datadir, subject, f'CP{subjectno}_block1_EEG.set')
+        
+        #increase subjectcount for each participant
+        subjectcount = subjectcount+1
+    
+        #Read in data    
+        raw = mne.io.read_raw_eeglab(raw_fname,preload=True)
+        
+        #get channel names
+        ch_names_all = raw.ch_names
+        
+        #load in EEG montage
+        ANT_montage = mne.channels.make_standard_montage("standard_1020")
+        
+        #drop initial channels, then create new list for channeles to drop per participant
+        drop_channel_list_initial = ["HEOG", "VEOG", "M1", "M2"]
+        drop_channel_list = []
+        raw.drop_channels(drop_channel_list_initial)
+        ch_names_full = raw.ch_names
+        for electrode in range(len(ch_names_all) - len(drop_channel_list_initial)):
+      
+            #If means exceed threshhold or are nan, add electrode number to the
+            #list for dropping 
+            if meanses[subjectno-1, electrode] > thd:      
+                drop_channel_list.append(electrode)
+            elif math.isnan(meanses[subjectno-1, electrode]):
+                drop_channel_list.append(electrode)
+        
+        drop_channel_list_electrodes = [electrodeDict.get(item,item) for item in drop_channel_list]
+        raw.drop_channels(drop_channel_list_electrodes)
+        
+        raw.set_montage(ANT_montage)
+        
+        
+        #Apply 50Hz notch filter
+        filtered = raw.copy().notch_filter(freqs=50)
+        
+        #extract triggers
+        events, event_id = mne.events_from_annotations(filtered)
+        
+        #Get electrode list
+        ch_names_subj = raw.ch_names
+        
+        #get EOIs - if any are absent, replace with false strings
+        if "F1" in ch_names_subj:
+            e1 = ch_names_subj.index("F1")
+        else:
+            e1 = 'false'
+        if "FC1" in ch_names_subj:
+            e2 = ch_names_subj.index("FC1")
+        else:
+            e2 = 'false'
+            
+        #if F1 or FC1 don't exist, then replace with existing value
+        if e1 == 'false':
+            e1 = e2
+        if e2 == 'false':
+            e2 = e1
+        
+        #make eindicies array of EOIs
+        eindices = np.array([e1,e2])
+  
+        #set condition triggers
+        legaltriggers = [10,20,30,40]
+        
+        #make variable for exracted values
+        extracted_values = []
+        
+        #use condition triggers as event triggers
+        for trigger in legaltriggers:
+            trigger_str = str(trigger)
+            if trigger_str in event_id:
+                extracted_values.append(event_id[trigger_str])
+        
+        #define event labels for each condition based on extracted values
+        event_dict = {
+                "NI": extracted_values[0],
+                "NIT": extracted_values[1],
+                "MS": extracted_values[2],
+                "UV": extracted_values[3]
+        }
+        
+        #Set rejection criteria
+        reject_criteria = None   #dict(eeg=200e-6)
+        
+        #epoch data
+        allepochs = mne.Epochs(filtered, events, event_id=event_dict, tmin=0.4,
+                               tmax=2.4, baseline=(0.4,2.4), reject=reject_criteria, 
+                               preload=True)
+        
+        #get trial data from epochs
+        trials = allepochs.get_data()*1000000
+       
+        temp = (trials[1,1,1:2001])
+            
+        fspec_combined = np.empty([1001,4])
+            
+        #get combined amplitude signal for each condition
+        for cond in range(2,6):
+            if cond==2: event_dict = {"NI": extracted_values[0]}
+            if cond==3: event_dict = {"NIT": extracted_values[1]}
+            if cond==4: event_dict = {"MS": extracted_values[2]}
+            if cond==5: event_dict = {"UV": extracted_values[3]}
+            condepochs = mne.Epochs(filtered, events, event_id=event_dict, tmin=0.4, 
+                                    tmax=2.4, baseline=(0.4,2.4), reject=reject_criteria, 
+                                    preload=True)
+            trials = condepochs.get_data()*1000000
+            combinedsignal = trials[0:23,eindices,0:2000]
+            combinedmean = np.mean(combinedsignal,axis=1)
+            trialavecombined = np.mean(combinedmean,axis=0)
+            temp = np.abs(np.fft.rfft(trialavecombined[0:2000]))/2000
+            fspec_combined[0:1001,cond-2] = temp
+                
+            
+            #average across all trials for scalp topographies
+            trialave = np.mean(trials,axis=0)
+            
+            #calculate the Fourier spectrum separately for each electrode 
+            #The waveform (timecourse) for each electrode is averaged across all trials and conditions
+            for n in range((len(ch_names_all) - len(drop_channel_list_initial)) - len(drop_channel_list_electrodes)):
+                ch_index = ch_names_full.index(ch_names_subj[n])
+                temp = np.fft.rfft(trialave[n,0:2000])/2000
+                allfspec[subjectcount-1,cond-2,ch_index,0:1001] = temp
+        
+        #plot fourier spectrum 
+        freqs = np.arange(0,500,0.5)     
+           
+        #put amplitudes into matrix for analysis - conditions are NI/NIT/MS/UV order
+        amplitudes[subjectcount,0:4] = fspec_combined[52,0:4]
+                                  
+  np.save('local/Allfspec.npy',allfspec)
+  np.save('local/amplitudes.npy',amplitudes)
+  np.save('local/channames.npy',ch_names_full)
+                                  
+```
+
+```{r SSEPanalysis, include=FALSE}
+
+#EEG Analysis
+
+#install needed package
+#install_miniconda()
+# use_miniconda('r-reticulate')
+
+#import numpy
+np <- import('numpy')
+
+#import data
+eegdata <- np$load('local/amplitudes.npy')
+allfspec <- np$load('local/Allfspec.npy')
+channames <- np$load('local/channames.npy')
+
+#make eegdata dataframes
+eegdata <- as.data.frame(eegdata)
+
+#drop rows with empty data (from removal of EEG data)
+eegdata <- eegdata[-c(21), ]
+
+#add PID column
+PID = (1:20)
+eegdata_1 <- cbind(PID, eegdata)
+
+#make data long format
+eegdata_2 <- eegdata_1 %>% pivot_longer(cols=c('V1',
+                                             'V2', 
+                                             'V3', 
+                                             'V4'),
+                                             names_to='Condition',
+                                             values_to='Amplitude')
+
+pdf('Figures/eegdata.pdf', width = 12, height = 11)
+#visualise data
+  ggplot(eegdata_2, aes(x = Condition, y = Amplitude)) + 
+  geom_violin(trim = FALSE) + 
+  geom_violin(aes(color = Condition), trim = FALSE) + 
+  geom_boxplot(width = 0.2, outlier.shape = NA, color = "black")+
+  geom_dotplot(binaxis = "y",
+               stackdir = "center",
+               dotsize = 0.5,
+               alpha = 0.2) +
+  ylab("SSEP Amplitude (µV)")+
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
+  font("xy.text", size = 15)+
+  scale_y_log10() +
+  scale_x_discrete(labels = c('NI','NIT','MS','UV'))+
+  #geom_signif(data=subjecitve_data_illusion_1,comparisons=list(c("NI.Illusion.Median","MS.Illusion.Median"),
+                                                               #c("NIT.Illusion.Median","MS.Illusion.Median"),
+                                                               #c("UV.Illusion.Median","MS.Illusion.Median")),
+              #map_signif_level = TRUE,annotations="***",y_position = c(115,135,145))+
+  scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
+  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+dev.off()
+
+#assumption check
+assumption_eeg1 <- eegdata_2 %>%
+  group_by(Condition) %>%
+  shapiro_test(Amplitude)
+
+#ggqqplot(eegdata_2, "Amplitude", facet.by = "Condition")
+
+#get medians and sds for eeg data
+eegdatamsds <- group_by(eegdata_2, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Amplitude, na.rm = TRUE),
+    sd = sd(Amplitude, na.rm = TRUE)
+  )
+
+#run one way RMANOVA for illusion data
+#res.aov4 <- anova_test(data = eegdata_2, dv = Amplitude, wid = PID, within = Condition)
+#get_anova_table(res.aov4)
+
+#posthoc tests
+# pwc4 <- eegdata_2 %>%
+# pairwise_t_test(
+# Amplitude ~ Condition, paired = TRUE,
+# p.adjust.method = "bonferroni"
+# )
+# pwc4
+
+#non-parametric test
+res.fried_eeg1 <- eegdata_2 %>% friedman_test(Amplitude ~ Condition |PID)
+effectsize_eeg1 <- eegdata_2 %>% friedman_effsize(Amplitude ~ Condition |PID)
+
+#posthoc tests
+nppwc_eeg1 <- eegdata_2 %>%
+  wilcox_test(Amplitude ~ Condition, paired = TRUE, comparisons = list(c("V1", "V3"), c("V1", "V4"), c("V1", "V2")), p.adjust.method = "holm")
+
+```
+
+```{r SSEPplotting}
+
+## EEG data plotting
+
+#create figure directory
+figdir <- 'Figures'
+
+#list of condition names
+titlelist <- c('NI','NIT','MS','UV')
+
+#confirmatory analysis electrodes
+targetelectrodes1 <- match(c('F1','FC1'),channames)
+
+allfspec[which(allfspec==0)] <- NA
+
+montage <- read.csv('local/montage.csv')   # read in the ANT montage
+allscalps <- apply(abs(allfspec[,,,53]),c(2,3),mean,na.rm=TRUE) # average response at 26Hz
+
+allscalps_1 <- allscalps
+
+#set upper limit for data
+for (r in 1:nrow(allscalps))
+  for (c in 1:ncol(allscalps)) 
+    if (allscalps[r,c] > 3) {
+    (allscalps[r,c] = 3)}
+  
+
+addalpha <- function(col, alpha=1){apply(sapply(col, col2rgb)/255, 2, function(x) rgb(x[1], x[2], x[3], alpha=alpha))}
+
+# helper function to interpolate over space
+v4Interp <- function(df, xo, yo, rmax = .75, gridRes = 67) {
+  ## Create a function to perform Matlab's v4 interpolation.
+  ## Takes as input a data-frame with columns x, y, and z (x co-ordinates, y co-ordinates, and amplitude)
+  ## and variables xo and yo, the co-ordinates which will be use to create a grid for interpolation
+  xo <- matrix(rep(xo,length(yo)),nrow = length(xo),ncol = length(yo))
+  yo <- t(matrix(rep(yo,length(xo)),nrow = length(yo),ncol = length(xo)))
+  xy <- df$x + df$y*sqrt(as.complex(-1))
+  d <- matrix(rep(xy,length(xy)),nrow = length(xy), ncol = length(xy))
+  d <- abs(d - t(d))
+  diag(d) <- 1
+  g <- (d^2) * (log(d)-1)   # Green's function.
+  diag(g) <- 0
+  weights <- qr.solve(g,df$z)
+  xy <- t(xy)
+  outmat <- matrix(nrow = gridRes,ncol = gridRes)
+  for (i in 1:gridRes){
+    for (j in 1:gridRes) {
+      test4 <- abs((xo[i,j] + sqrt(as.complex(-1))*yo[i,j]) - xy)
+      g <- (test4^2) * (log(test4)-1)
+      outmat[i,j] <- g %*% weights}}
+  outDf <- data.frame(x = xo[,1],outmat)
+  names(outDf)[1:length(yo[1,])+1] <- yo[1,]
+  return(outDf)}
+
+## Create data frame to be used for interpolation - the function needs columns labelled x, y, and z
+rmax <- 0.55   #specify a maximum boundary for the grid
+gridRes <- 100 #specify the interpolation grid resolution
+
+#ramp2 <- colorRamp(c("black","darkblue","darkorange3","lightblue","white"))
+ramp2 <- colorRamp(c("white","darkorange","darkorange3","darkorange4","black"))
+colmatrix2 <- rgb(ramp2(seq(0, 1, length = 101)), max = 255)
+
+xpos <- 1:62
+ypos <- 1:62
+for (ch in 1:62){
+  i <- match(toupper(channames[ch]),toupper(as.character(montage$Electrode)))
+  xpos[ch] <- montage$X_position[i]
+  ypos[ch] <- montage$Y_position[i]
+}
+
+# make scalp topography for each condition using the average data
+for (cond in 1:4){
+
+datatoplot <- allscalps[cond,]
+testDat<- data.frame(x = xpos,
+                     y = -ypos,
+                     z = datatoplot)
+
+#Create the interpolation grid
+xo <- seq(min(-rmax, testDat$x), max(rmax, testDat$x), length = gridRes)
+yo <- seq(max(rmax, testDat$y), min(-rmax, testDat$y), length = gridRes)
+
+interpV4 <- v4Interp(testDat, xo, yo, rmax, gridRes)
+
+zo2 <- as.matrix(interpV4[,2:ncol(interpV4)])
+
+xo2 <- matrix(rep(xo,length(yo)),nrow = length(xo),ncol = length(yo))
+yo2 <- t(matrix(rep(yo,length(xo)),nrow = length(yo),ncol = length(xo)))
+outsidecircle <- sqrt(xo2^2 + yo2^2) > 0.51
+zo2[outsidecircle] <- 0
+zo2[zo2<0] <- 0
+
+#make head plots
+tiff(paste0(figdir,'/head_',titlelist[cond],'.tiff'),width=400,height=400)
+
+plotlims <- c(-rmax,rmax,-rmax,rmax)  # define the x and y limits of the plot (minx,maxx,miny,maxy)
+par(pty="s")  # make axis square
+plot(x=NULL,y=NULL,ann=FALSE, axes=FALSE, xlim=plotlims[1:2], ylim=plotlims[3:4])   # create an empty axis of the correct dimensions
+image(xo,xo,zo2,col=colmatrix2,zlim=c(0,3.1),add=TRUE,useRaster=FALSE)
+maskx <- c(montage$OutlineX[1:51]*2.2,montage$OutlineX[51:1])
+masky <- c(montage$OutlineY[1:51]*2.2,montage$OutlineY[51:1])
+polygon(maskx,masky,border=NA,col="white")
+maskx <- c(montage$OutlineX[51:101]*2.2,montage$OutlineX[101:51])
+masky <- c(montage$OutlineY[51:101]*2.2,montage$OutlineY[101:51])
+polygon(maskx,masky,border=NA,col="white")
+
+points(xpos[targetelectrodes1],ypos[targetelectrodes1],pch=16,col="purple",cex=1.6)
+
+lines(montage$OutlineX,montage$OutlineY,col="black",lwd=2)
+lines(montage$NoseX,montage$NoseY,col="black",lwd=2)
+lines(montage$LearX,montage$LearY,col="black",lwd=2)
+lines(montage$RearX,montage$RearY,col="black",lwd=2)
+
+dev.off()
+
+
+#make colour bar
+tiff('Figures/colourbar.tiff', height = 600, width = 600, units="px", bg="white")
+plot(x=NULL,y=NULL,ann=FALSE, axes=FALSE, xlim=c(-5,5), ylim=c(0,1))   # create an empty axis of the correct dimensions
+z=matrix(1:101,nrow=1)
+x=0
+y=seq(0,1,len=101)
+image(x,y,z,col=colmatrix2,add=TRUE,useRaster=TRUE)
+dev.off()
+}
+
+
+#create spectra plots
+pdf(paste0(figdir,"/spectrum.pdf"), width=12, height=12)
+par(mfrow=c(2,2))
+# plot the Fourier spectra across all electrodes
+f <- seq(0,499.5,0.5)
+
+  ticklocsx <- seq(0,50,10)
+  ticklocsy <- seq(0,0.5,0.1)
+
+meanftemp <- apply(allfspec[,,targetelectrodes1,],c(1,2,4),mean,na.rm=TRUE)
+meanfspec <- apply(abs(meanftemp),c(2,3),median,na.rm=TRUE)
+SEfspec <- apply(abs(meanftemp),c(2,3),sd, na.rm=TRUE)/sqrt(46)
+
+for (cond in 1:4){
+  
+  h1 <- readTIFF(paste0(figdir,'/head_',titlelist[cond],'.tiff'))
+  e3 <- readTIFF('Figures/colourbar.tiff')
+
+  plot(x=NULL,y=NULL,axes=FALSE, ann=FALSE, xlim=c(min(ticklocsx),max(ticklocsx)), ylim=c(min(ticklocsy),max(ticklocsy)))
+  axis(1, at=ticklocsx, tck=0.01, lab=F, lwd=2)     # plot tick marks (no labels)
+  axis(2, at=ticklocsy, tck=0.01, lab=F, lwd=2)
+  mtext(text = ticklocsx, side = 1, at=ticklocsx, line=0.5, cex=1.3)
+  mtext(text = ticklocsy, side = 2, at=ticklocsy, line=0.2, las=1, cex=1.3)
+  title(xlab='Frequency (Hz)', col.lab=rgb(0,0,0), line=2, cex.lab=2.5)
+  title(ylab='Amplitude (µV)', col.lab=rgb(0,0,0), line=2.4, cex.lab=2.5)
+  title(main=titlelist[cond],cex.main=2)  
+
+  aspratio <- 90  # this is the aspect ratio of the output pdf
+  imwidth <- 0.4
+  xstart <- 18
+  ystart <- 0.15
+  rasterImage(h1,xstart,ystart,xstart+imwidth*aspratio,ystart+imwidth) 
+  
+  imwidth <- 0.1
+  xstart <- 40
+  ystart <- 0.12
+  rasterImage(e3,xstart,ystart,xstart+imwidth*aspratio,ystart+imwidth)
+  
+  text(38,0.12,'0',pos=4,cex=1.8)
+  text(36.5,0.2,'>3',pos=4,cex=1.8)
+  text(49,0.24,'Amplitude',pos=4,cex=2,srt=270)
+  
+polygon(f[c(3:100,100:3)],c(meanfspec[cond,3:100]+SEfspec[cond,3:100],meanfspec[cond,100:3]-SEfspec[cond,100:3]),col=addalpha('darkorange3',0.25),border=NA)
+lines(f[3:100],meanfspec[cond,3:100],lwd=3) 
+# lines(c(0,50), meanfspec[1,c(53,53)],lty=2)
+# lines(c(26,26),c(0,0.5),col='red')
+}
+dev.off()
+
+#assess electrodes with greatest response
+
+#turn allscalps into dataframe
+allscalps2 <- as.data.frame(allscalps_1)
+
+#sum the data from each condition for each electrode and create new dataframe
+sumscalps <- allscalps2 %>%
+  pivot_longer(cols = everything(), names_to = "Electrode", values_to = "val") %>%
+  group_by(Electrode) %>%
+  summarise(Total = sum(val))
+
+#order new dataframe in ascending order to show 2 electrodes with greatest response (V2, V40 (Fpz, FCz))
+sumscalps2 <- arrange(sumscalps, Total)
+
+
+```
+
+```{r subjectiveanalysis}
+
+#load in demographic data
+demographic_data <- read.csv("local/demographics.csv")
+
+mean_age = mean(demographic_data$Age)
+max_age = (max(demographic_data$Age, na.rm=TRUE))
+min_age = (min(demographic_data$Age, na.rm=TRUE))
+sex_table = as.data.frame(table(demographic_data$Sex))
+ethnicity_table = as.data.frame(table(demographic_data$Ethnicity))
+condition_table = as.data.frame(table(demographic_data$Condition))
+
+#load in handedness data
+handedness_data <- read.csv("local/handedness.csv")
+
+#make cells numeric
+handedness_data[1] <- lapply(handedness_data[1], as.numeric)
+
+#change sign from negative to positive
+handedness_data[sapply(handedness_data, is.numeric)] <- handedness_data[sapply(handedness_data, is.numeric)] * -1
+
+#find means, min and max values 
+mean_handedness = mean(handedness_data$Handedness)
+max_handedness = (max(handedness_data$Handedness, na.rm=TRUE))
+min_handedness = (min(handedness_data$Handedness, na.rm=TRUE))
+
+#load in subjective data
+subjective_data <- read.csv("local/subjective data.csv")
+
+#make new dataset for normalised data
+subjective_data_new <- subjective_data
+
+#subtract the control median from the illusion and disownship medians for all conditions across all participants
+for (n in 1:21){
+subjective_data_new[(n),4] <- subjective_data[(n),4] - subjective_data[(n),10]
+subjective_data_new[(n),7] <- subjective_data[(n),7] - subjective_data[(n),10]
+subjective_data_new[(n),13] <- subjective_data[(n),13] - subjective_data[(n),19]
+subjective_data_new[(n),16] <- subjective_data[(n),16] - subjective_data[(n),19]
+subjective_data_new[(n),22] <- subjective_data[(n),22] - subjective_data[(n),28]
+subjective_data_new[(n),25] <- subjective_data[(n),25] - subjective_data[(n),28]
+subjective_data_new[(n),31] <- subjective_data[(n),31] - subjective_data[(n),37]
+subjective_data_new[(n),34] <- subjective_data[(n),34] - subjective_data[(n),37]
+}
+
+#illusion analysis
+
+#keep data needed for illusion analysis
+subjective_data_illusion <- subset(subjective_data_new, select = -c(NI.Illusion.1,NI.Illusion.2,NI.Disownership.1,NI.Disownership.2,NI.Disownership.Median,NI.Control.1,NI.Control.2, NI.Control.Median,
+                                                                    NIT.Illusion.1,NIT.Illusion.2,NIT.Disownership.1,NIT.Disownership.2,NIT.Disownership.Median,NIT.Control.1,NIT.Control.2, NIT.Control.Median,
+                                                                    MS.Illusion.1,MS.Illusion.2,MS.Disownership.1,MS.Disownership.2,MS.Disownership.Median,MS.Control.1,MS.Control.2, MS.Control.Median,
+                                                                    UV.Illusion.1,UV.Illusion.2,UV.Disownership.1,UV.Disownership.2,UV.Disownership.Median,UV.Control.1,UV.Control.2, UV.Control.Median))
+
+#make data long format
+subjecitve_data_illusion_1 <- subjective_data_illusion %>% pivot_longer(cols=c('NI.Illusion.Median',
+                                                 'NIT.Illusion.Median', 
+                                                 'MS.Illusion.Median', 
+                                                 'UV.Illusion.Median'),
+                    names_to='Condition',
+                    values_to='Score')
+
+subjecitve_data_illusion_1 <- subjecitve_data_illusion_1 %>%
+  mutate(Condition=factor(Condition,levels=c("NI.Illusion.Median", "NIT.Illusion.Median", "MS.Illusion.Median", "UV.Illusion.Median")))
+
+pdf('Figures/illusiondata.pdf', width = 12, height = 12)
+#visualise data
+  ggplot(subjecitve_data_illusion_1, aes(x = Condition, y = Score)) + 
+  geom_violin(trim = FALSE) + 
+  geom_violin(aes(color = Condition), trim = FALSE) + 
+  geom_boxplot(width = 0.2, outlier.shape = NA, color = "black")+
+  geom_dotplot(binaxis = "y",
+               stackdir = "center",
+               dotsize = 0.5,
+               alpha = 0.2) +
+  ylab("Illusion Score")+
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
+  font("xy.text", size = 15)+
+  scale_x_discrete(labels = c('NI','NIT','MS','UV'))+
+  geom_signif(data=subjecitve_data_illusion_1,comparisons=list(c("NI.Illusion.Median","MS.Illusion.Median"),
+                                                               c("NIT.Illusion.Median","MS.Illusion.Median"),
+                                                               c("UV.Illusion.Median","MS.Illusion.Median")),
+              map_signif_level = TRUE,annotations="***",y_position = c(115,135,145))+
+  scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
+  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+dev.off()
+
+#assumption check
+illusionassump <- subjecitve_data_illusion_1 %>%
+  group_by(Condition) %>%
+  shapiro_test(Score)
+
+#ggqqplot(subjecitve_data_illusion_1, "Score", facet.by = "Condition")
+
+#run one way RMANOVA for illusion data
+#res.aov1 <- anova_test(data = subjecitve_data_illusion_1, dv = Score, wid = PID, within = Condition)
+#get_anova_table(res.aov1)
+
+#get medians and sds for illusion data
+illusionmsds <- group_by(subjecitve_data_illusion_1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+illusionmsds
+
+#posthoc tests
+#pwc1 <- subjecitve_data_illusion_1 %>%
+  #pairwise_t_test(
+    #Score ~ Condition, paired = TRUE,
+    #p.adjust.method = "bonferroni"
+  #)
+#pwc1
+
+#non-parametric tests
+res.fried_illusion <- subjecitve_data_illusion_1 %>% friedman_test(Score ~ Condition |PID)
+effectsize_illusion <- subjecitve_data_illusion_1 %>% friedman_effsize(Score ~ Condition |PID)
+
+#posthoc tests
+nppwc_illusion <- subjecitve_data_illusion_1 %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm")
+
+#disownership analysis
+
+#keep data needed for disownership analysis
+subjective_data_disownership <- subset(subjective_data_new, select = -c(NI.Illusion.1,NI.Illusion.2,NI.Disownership.1,NI.Disownership.2,NI.Illusion.Median,NI.Control.1,NI.Control.2, NI.Control.Median,
+                                                                    NIT.Illusion.1,NIT.Illusion.2,NIT.Disownership.1,NIT.Disownership.2,NIT.Illusion.Median,NIT.Control.1,NIT.Control.2, NIT.Control.Median,
+                                                                    MS.Illusion.1,MS.Illusion.2,MS.Disownership.1,MS.Disownership.2,MS.Illusion.Median,MS.Control.1,MS.Control.2, MS.Control.Median,
+                                                                    UV.Illusion.1,UV.Illusion.2,UV.Disownership.1,UV.Disownership.2,UV.Illusion.Median,UV.Control.1,UV.Control.2, UV.Control.Median))
+
+#make data long format
+subjecitve_data_disownership_1 <- subjective_data_disownership %>% pivot_longer(cols=c('NI.Disownership.Median',
+                                                                               'NIT.Disownership.Median', 
+                                                                               'MS.Disownership.Median', 
+                                                                               'UV.Disownership.Median'),
+                                                                        names_to='Condition',
+                                                                        values_to='Score')
+
+subjecitve_data_disownership_1 <- subjecitve_data_disownership_1 %>%
+  mutate(Condition=factor(Condition,levels=c("NI.Disownership.Median", "NIT.Disownership.Median", "MS.Disownership.Median", "UV.Disownership.Median")))
+
+pdf('Figures/disownershipdata.pdf', width = 12, height = 11)
+#visualise data
+  ggplot(subjecitve_data_disownership_1, aes(x = Condition, y = Score)) + 
+  geom_violin(trim = FALSE) + 
+  geom_violin(aes(color = Condition), trim = FALSE) + 
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+  geom_dotplot(binaxis = "y",
+               stackdir = "center",
+               dotsize = 0.5,
+               alpha = 0.2) +
+  ylab("Disownerhsip Score")+
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
+  font("xy.text", size = 15)+
+  scale_x_discrete(labels = c('NI','NIT','MS','UV'))+
+  geom_signif(data=subjecitve_data_disownership_1,comparisons=list(c("NI.Disownership.Median","UV.Disownership.Median"),
+                                                               c("NIT.Disownership.Median","UV.Disownership.Median"),
+                                                               c("MS.Disownership.Median","UV.Disownership.Median")),
+              map_signif_level = TRUE,annotations=c("*","*","*"),y_position = c(115,130,145))+
+  scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
+  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+dev.off()
+
+#assumption check
+subjecitve_data_disownership_1 %>%
+  group_by(Condition) %>%
+  shapiro_test(Score)
+
+#ggqqplot(subjecitve_data_disownership_1, "Score", facet.by = "Condition")
+
+#run one way RMANOVA for illusion data
+#res.aov2 <- anova_test(data = subjecitve_data_disownership_1, dv = Score, wid = PID, within = Condition)
+#get_anova_table(res.aov2)
+
+#get medians and sds for disownership data
+disownershipmsds <- group_by(subjecitve_data_disownership_1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+disownershipmsds
+
+#posthoc tests
+#pwc2 <- subjecitve_data_disownership_1 %>%
+  #pairwise_t_test(
+    #Score ~ Condition, paired = TRUE,
+    #p.adjust.method = "bonferroni"
+  #)
+#pwc2
+
+#non-parametric tests
+res.fried_disownership <- subjecitve_data_disownership_1 %>% friedman_test(Score ~ Condition |PID)
+effectsize_disownership <- subjecitve_data_disownership_1 %>% friedman_effsize(Score ~ Condition |PID)
+
+#posthoc tests
+nppwc_disownership <- subjecitve_data_disownership_1 %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm")
+
+
+
+#control analysis
+
+#keep data needed for control analysis
+subjective_data_control <- subset(subjective_data_new, select = -c(NI.Illusion.1,NI.Illusion.2,NI.Disownership.1,NI.Disownership.2,NI.Illusion.Median,NI.Control.1,NI.Control.2, NI.Disownership.Median,
+                                                                        NIT.Illusion.1,NIT.Illusion.2,NIT.Disownership.1,NIT.Disownership.2,NIT.Illusion.Median,NIT.Control.1,NIT.Control.2, NIT.Disownership.Median,
+                                                                        MS.Illusion.1,MS.Illusion.2,MS.Disownership.1,MS.Disownership.2,MS.Illusion.Median,MS.Control.1,MS.Control.2, MS.Disownership.Median,
+                                                                        UV.Illusion.1,UV.Illusion.2,UV.Disownership.1,UV.Disownership.2,UV.Illusion.Median,UV.Control.1,UV.Control.2, UV.Disownership.Median))
+
+#make data long format
+subjecitve_data_control_1 <- subjective_data_control %>% pivot_longer(cols=c('NI.Control.Median',
+                                                                                       'NIT.Control.Median', 
+                                                                                       'MS.Control.Median', 
+                                                                                       'UV.Control.Median'),
+                                                                                names_to='Condition',
+                                                                                values_to='Score')
+
+subjecitve_data_control_1 <- subjecitve_data_control_1 %>%
+  mutate(Condition=factor(Condition,levels=c("NI.Control.Median", "NIT.Control.Median", "MS.Control.Median", "UV.Control.Median")))
+
+pdf('Figures/controldata.pdf', width = 12, height = 11)
+#visualise data
+  ggplot(subjecitve_data_control_1, aes(x = Condition, y = Score)) + 
+  geom_violin(trim = FALSE) + 
+  geom_violin(aes(color = Condition), trim = FALSE) + 
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+  geom_dotplot(binaxis = "y",
+               stackdir = "center",
+               dotsize = 0.5,
+               alpha = 0.2) +
+  ylab("Control Score")+
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
+  font("xy.text", size = 15)+
+  scale_x_discrete(labels = c('NI','NIT','MS','UV'))+
+  geom_signif(data=subjecitve_data_control_1,comparisons=list(c("NI.Control.Median","UV.Control.Median")),
+              map_signif_level = TRUE,annotations=c("*"),y_position = c(145))+
+  scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
+  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+dev.off()
+
+#assumption check
+subjecitve_data_control_1 %>%
+  group_by(Condition) %>%
+  shapiro_test(Score)
+
+#ggqqplot(subjecitve_data_control_1, "Score", facet.by = "Condition")
+
+#run one way RMANOVA for illusion data
+#res.aov3 <- anova_test(data = subjecitve_data_control_1, dv = Score, wid = PID, within = Condition)
+#get_anova_table(res.aov3)
+
+#get medians and sds for control data
+controlmsds <- group_by(subjecitve_data_control_1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+#posthoc tests
+#pwc3 <- subjecitve_data_control_1 %>%
+  #pairwise_t_test(
+    #Score ~ Condition, paired = TRUE,
+    #p.adjust.method = "bonferroni"
+  #)
+#pwc3
+
+#non-parametric tests
+res.fried_control <- subjecitve_data_control_1 %>% friedman_test(Score ~ Condition |PID)
+effectsize_control <- subjecitve_data_control_1 %>% friedman_effsize(Score ~ Condition |PID)
+
+#posthoc tests
+nppwc_control <- subjecitve_data_control_1 %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "bonferroni")
+
+
+
+#exploratory correlation analysis
+
+#drop rows with empty data (from removal of EEG data)
+subjecitve_data_illusion_corr <- subjecitve_data_illusion_1[-c(5,6,7,8), ]
+
+correlation_data <- cbind(eegdata_2[3],subjecitve_data_illusion_corr[1:3])
+
+
+pdf('Figures/correlationdata.pdf', width = 12, height = 11)
+  ggscatter(correlation_data, x = "Score", y = "Amplitude", 
+          facet.by = "Condition",
+          panel.labs = list( Condition=c( "NI","NIT","MS","UV") ),
+          #add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman",
+          cor.coef.size = 8,
+          xlab = "Subjecitve Illusion Score", ylab = "SSEP Amplitude (µV)") +
+    theme(text = element_text(size = 20))
+          
+dev.off()
+
+
+```
+
+```{r painanalysis}
+
+#load in pain data
+pain_data <- read.csv("local/pain data.csv")
+
+#keep data needed for NI analysis
+pain_data_NI <- subset(pain_data, select = -c(Difference, Difference.1, Difference.2, Difference.3, NIT.Pre, NIT.Post, MS.Pre, MS.Post, UV.Pre, UV.Post))
+
+#keep data needed for NIT analysis
+pain_data_NIT <- subset(pain_data, select = -c(Difference, Difference.1, Difference.2, Difference.3, NI.Pre, NI.Post, MS.Pre, MS.Post, UV.Pre, UV.Post))
+
+#keep data needed for MS analysis
+pain_data_MS <- subset(pain_data, select = -c(Difference, Difference.1, Difference.2, Difference.3, NI.Pre, NI.Post, NIT.Pre, NIT.Post, UV.Pre, UV.Post))
+
+#keep data needed for UV analysis
+pain_data_UV <- subset(pain_data, select = -c(Difference, Difference.1, Difference.2, Difference.3, NI.Pre, NI.Post, NIT.Pre, NIT.Post, MS.Pre, MS.Post))
+
+#add paintype data
+pain_data_NI1 <- cbind(pain_data_NI,pain.type = demographic_data$Pain.Type)
+pain_data_NIT1 <- cbind(pain_data_NIT,pain.type = demographic_data$Pain.Type)
+pain_data_MS1 <- cbind(pain_data_MS,pain.type = demographic_data$Pain.Type)
+pain_data_UV1 <- cbind(pain_data_UV,pain.type = demographic_data$Pain.Type)
+
+#make data long format
+pain_data_NI1 <- pain_data_NI1 %>% pivot_longer(cols=c('NI.Pre', 'NI.Post'),
+                    names_to='Condition',
+                    values_to='Score')
+
+pain_data_NIT1 <- pain_data_NIT1 %>% pivot_longer(cols=c('NIT.Pre', 'NIT.Post'),
+                    names_to='Condition',
+                    values_to='Score')
+
+pain_data_MS1 <- pain_data_MS1 %>% pivot_longer(cols=c('MS.Pre', 'MS.Post'),
+                    names_to='Condition',
+                    values_to='Score')
+
+pain_data_UV1 <- pain_data_UV1 %>% pivot_longer(cols=c('UV.Pre', 'UV.Post'),
+                    names_to='Condition',
+                    values_to='Score')
+
+#Paired Samples Wilcoxon Test
+paintestNI <- pain_data_NI1  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+paintestNIT <- pain_data_NIT1  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+paintestMS <- pain_data_MS1  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+paintestUV <- pain_data_UV1  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+#medians and sds for pain data
+NIpainmsds <- group_by(pain_data_NI1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+NITpainmsds <- group_by(pain_data_NIT1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+MSpainmsds <- group_by(pain_data_MS1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+UVpainmsds <- group_by(pain_data_UV1, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+#plot data
+
+#add paired column to datasets
+pain_data_NI1$paired <- c(1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21)
+pain_data_NIT1$paired <- c(1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21)
+pain_data_MS1$paired <- c(1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21)
+pain_data_UV1$paired <- c(1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21)
+
+library(gridExtra)
+pdf('Figures/pain.pdf', width = 12, height = 11)
+
+# create plot for NI data 
+NIpain <- ggplot(pain_data_NI1, aes(x=factor (Condition,level=c('NI.Pre', 'NI.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="darkorange3",outlier.color= "black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color= "black", alpha=0.2) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion')+
+ylim(0,20) +
+geom_signif(data=pain_data_NI1,comparisons=list(c("NI.Pre","NI.Post")),
+              map_signif_level = TRUE,annotations="*",y_position = c(17))+
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for NIT data 
+NITpain <- ggplot(pain_data_NIT1, aes(x=factor (Condition,level=c('NIT.Pre', 'NIT.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="darkorange3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black",alpha=0.2) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion Tactile')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for MS data
+MSpain <- ggplot(pain_data_MS1, aes(x=factor (Condition,level=c('MS.Pre', 'MS.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="darkorange3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black",alpha=0.2) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Multisensory')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+
+# create plot for UV data 
+UVpain <- ggplot(pain_data_UV1, aes(x=factor (Condition,level=c('UV.Pre', 'UV.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="darkorange3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black",alpha=0.2) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Unimodal-Visual')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+grid.arrange(NIpain, NITpain, MSpain, UVpain, ncol=2, nrow =2)
+dev.off()
+
+#pain data by condition
+secondaryNI <- subset(pain_data_NI1, grepl('seagreen4', pain.type))
+secondaryNIT <- subset(pain_data_NIT1, grepl('seagreen4', pain.type))
+secondaryMS <- subset(pain_data_MS1, grepl('seagreen4', pain.type))
+secondaryUV <- subset(pain_data_UV1, grepl('seagreen4', pain.type))
+
+primaryNI <- subset(pain_data_NI1, grepl('magenta3', pain.type))
+primaryNIT <- subset(pain_data_NIT1, grepl('magenta3', pain.type))
+primaryMS <- subset(pain_data_MS1, grepl('magenta3', pain.type))
+primaryUV <- subset(pain_data_UV1, grepl('magenta3', pain.type))
+
+#exploratory secondary pain analysis
+secondarytestNI <- secondaryNI  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+secondarytestNIT <- secondaryNIT  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+secondarytestMS <- secondaryMS  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+secondarytestUV <- secondaryUV  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+#medians and sds for pain data
+NIpainmsds2 <- group_by(secondaryNI, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+NITpainmsds2 <- group_by(secondaryNIT, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+MSpainmsds2 <- group_by(secondaryMS, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+UVpainmsds2 <- group_by(secondaryUV, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+
+pdf('Figures/pain_cond2.pdf', width = 12, height = 11)
+
+# create plot for NI data 
+NIpainc2 <- ggplot(secondaryNI, aes(x=factor (Condition,level=c('NI.Pre', 'NI.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="seagreen4",outlier.color= "black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color= "black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for NIT data 
+NITpainc2 <- ggplot(secondaryNIT, aes(x=factor (Condition,level=c('NIT.Pre', 'NIT.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="seagreen4",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion Tactile')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for MS data
+MSpainc2 <- ggplot(secondaryMS, aes(x=factor (Condition,level=c('MS.Pre', 'MS.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="seagreen4",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Multisensory')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+
+# create plot for UV data 
+UVpainc2 <- ggplot(secondaryUV, aes(x=factor (Condition,level=c('UV.Pre', 'UV.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="seagreen4",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Unimodal-Visual')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+grid.arrange(NIpainc2, NITpainc2, MSpainc2, UVpainc2, ncol=2, nrow =2)
+dev.off()
+
+
+#exploratory primary pain analysis
+primarytestNI <- primaryNI  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+primarytestNIT <- primaryNIT  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+primarytestMS <- primaryMS  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+primarytestUV <- primaryUV  %>%
+  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  add_significance()
+
+#medians and sds for pain data
+NIpainmsds1 <- group_by(primaryNI, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+NITpainmsds1 <- group_by(primaryNIT, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+MSpainmsds1 <- group_by(primaryMS, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+UVpainmsds1 <- group_by(primaryUV, Condition) %>%
+  summarise(
+    count = n(),
+    median = median(Score, na.rm = TRUE),
+    sd = sd(Score, na.rm = TRUE)
+  )
+
+
+pdf('Figures/pain_cond1.pdf', width = 12, height = 11)
+
+# create plot for NI data 
+NIpainc1 <- ggplot(primaryNI, aes(x=factor (Condition,level=c('NI.Pre', 'NI.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="magenta3",outlier.color= "black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color= "black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for NIT data 
+NITpainc1 <- ggplot(primaryNIT, aes(x=factor (Condition,level=c('NIT.Pre', 'NIT.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="magenta3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Non-Illusion Tactile')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+# create plot for MS data
+MSpainc1 <- ggplot(primaryMS, aes(x=factor (Condition,level=c('MS.Pre', 'MS.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="magenta3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Multisensory')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+
+# create plot for UV data 
+UVpainc1 <- ggplot(primaryUV, aes(x=factor (Condition,level=c('UV.Pre', 'UV.Post')), y=Score, fill=Condition)) + 
+geom_boxplot(color="magenta3",outlier.color="black",alpha=0.2,fill="white")+ 
+geom_point(color="black",alpha=0.2)+ 
+geom_line(aes(group=paired),color="black", alpha=0.5) +
+theme_minimal() +
+theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+guides(fill = FALSE) +
+ylab('Pain Score (0 - 20)')+
+xlab('Unimodal-Visual')+
+ylim(0,20) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank())
+
+grid.arrange(NIpainc1, NITpainc1, MSpainc1, UVpainc1, ncol=2, nrow =2)
+dev.off()
+
+#exploratory percentage change analysis
+pain_data_PC <- pain_data %>%
+  mutate(percentage_change_NI = ((NI.Post - NI.Pre) / NI.Pre) * 100) %>%
+  mutate(percentage_change_NIT = ((NIT.Post - NIT.Pre) / NIT.Pre) * 100) %>%
+  mutate(percentage_change_MS = ((MS.Post - MS.Pre) / MS.Pre) * 100) %>%
+  mutate(percentage_change_UV = ((UV.Post - UV.Pre) / UV.Pre) * 100)
+
+# Calculate the number of instances where percentage_change is a reduction
+num_instances_NIR <- pain_data_PC %>%
+  filter(percentage_change_NI < 0) %>%
+  nrow()
+
+num_instances_NITR <- pain_data_PC %>%
+  filter(percentage_change_NIT < 0) %>%
+  nrow()
+
+num_instances_MSR <- pain_data_PC %>%
+  filter(percentage_change_MS < 0) %>%
+  nrow()
+
+num_instances_UVR <- pain_data_PC %>%
+  filter(percentage_change_UV < 0) %>%
+  nrow()
+
+# Calculate the number of instances where percentage_change is greater than a 30% reduction
+num_instances_NI30 <- pain_data_PC %>%
+  filter(percentage_change_NI < -30) %>%
+  nrow()
+
+num_instances_NIT30 <- pain_data_PC %>%
+  filter(percentage_change_NIT < -30) %>%
+  nrow()
+
+num_instances_MS30 <- pain_data_PC %>%
+  filter(percentage_change_MS < -30) %>%
+  nrow()
+
+num_instances_UV30 <- pain_data_PC %>%
+  filter(percentage_change_UV < -30) %>%
+  nrow()
+
+# Calculate the number of instances where percentage_change is greater than a 50% reduction
+num_instances_NI50 <- pain_data_PC %>%
+  filter(percentage_change_NI < -50) %>%
+  nrow()
+
+num_instances_NIT50 <- pain_data_PC %>%
+  filter(percentage_change_NIT < -50) %>%
+  nrow()
+
+num_instances_MS50 <- pain_data_PC %>%
+  filter(percentage_change_MS < -50) %>%
+  nrow()
+
+num_instances_UV50 <- pain_data_PC %>%
+  filter(percentage_change_UV < -50) %>%
+  nrow()
+
+# Calculate the number of instances where percentage_change is 0
+num_instances_NI0 <- pain_data_PC %>%
+  filter(percentage_change_NI ==0) %>%
+  nrow()
+
+num_instances_NIT0 <- pain_data_PC %>%
+  filter(percentage_change_NIT ==0) %>%
+  nrow()
+
+num_instances_MS0 <- pain_data_PC %>%
+  filter(percentage_change_MS ==0) %>%
+  nrow()
+
+num_instances_UV0 <- pain_data_PC %>%
+  filter(percentage_change_UV ==0) %>%
+  nrow()
+
+# Calculate the number of instances where percentage_change is greater
+num_instances_NIG <- pain_data_PC %>%
+  filter(percentage_change_NI > 0) %>%
+  nrow()
+
+num_instances_NITG <- pain_data_PC %>%
+  filter(percentage_change_NIT > 0) %>%
+  nrow()
+
+num_instances_MSG <- pain_data_PC %>%
+  filter(percentage_change_MS > 0) %>%
+  nrow()
+
+num_instances_UVG <- pain_data_PC %>%
+  filter(percentage_change_UV > 0) %>%
+  nrow()
+
+#plot percentage change data
+PCplotdata <- subset(pain_data_PC, select = -c(Difference, Difference.1, Difference.2, Difference.3, NI.Pre, NI.Post, NIT.Pre, NIT.Post, MS.Pre, MS.Post, UV.Pre, UV.Post))
+
+PCplotdata <- cbind(PCplotdata, pain.type = demographic_data$Pain.Type)
+
+PCplotdata$PID <- factor(PCplotdata$PID, levels = PCplotdata$PID)
+
+pdf('Figures/pain_exp.pdf', width = 12, height = 11)
+
+NI_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NI)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Non-Illusion",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 2.75)
+
+NIT_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Non-Illusion Tactile",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 2.75)
+
+MS_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Multisensory",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=16, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=16, y=-49, label="Extremely meaningful",size = 2.75)
+
+UV_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Unimodal-Visual",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=10, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=10, y=-49, label="Extremely meaningful",size = 2.75)
+
+grid.arrange(NI_exp, NIT_exp, MS_exp, UV_exp, ncol=2, nrow =2)
+dev.off()
+
+#exploratory percentage change by condition
+pdf('Figures/pain_expc.pdf', width = 12, height = 11)
+
+NI_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NI)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Non-Illusion",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 2.75)
+
+NIT_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Non-Illusion Tactile",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 2.75)
+
+MS_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Multisensory",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=16, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=16, y=-49, label="Extremely meaningful",size = 2.75)
+
+UV_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
+  geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
+  scale_fill_discrete(drop=FALSE) +
+  scale_x_discrete(drop=FALSE) +
+  ylim(-150,300) +
+  labs(x = "Unimodal-Visual",
+       y = "Percentage Change (%)") +
+  theme_minimal() +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+      axis.line.y = element_line(color="black", size = 0,5)) +
+  theme(axis.text.x = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+  panel.background = element_blank()) +
+  geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
+  annotate("text", x=10, y=-29, label="Clinically meaningful", size = 2.75) +
+  geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
+  annotate("text", x=10, y=-49, label="Extremely meaningful",size = 2.75)
+
+grid.arrange(NI_expc, NIT_expc, MS_expc, UV_expc, ncol=2, nrow =2)
+dev.off()
+
+
+#exploratory correlation analysis
+
+#correlation between EEG data and pain percentage change
+#drop rows with empty data (from removal of EEG data)
+PCdata_corr <- pain_data_PC[-c(2), -c(2:13) ]
+
+#make data long format
+PCdata_corr <- PCdata_corr %>% pivot_longer(cols=c('percentage_change_NI', 'percentage_change_NIT','percentage_change_MS', 'percentage_change_UV'),
+                    names_to='Condition',
+                    values_to='Score')
+
+correlation_data2 <- cbind(eegdata_2[3],PCdata_corr[1:3])
+
+
+pdf('Figures/correlationdata2.pdf', width = 12, height = 11)
+  ggscatter(correlation_data2, x = "Score", y = "Amplitude", 
+          facet.by = "Condition",
+          panel.labs = list( Condition=c( "NI","NIT","MS","UV") ),
+          #add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman",
+          cor.coef.size = 8,
+          xlab = "Pain Percentage Change", ylab = "SSEP Amplitude (µV)") +
+    theme(text = element_text(size = 20))
+          
+dev.off()
+
+#correlation between pain and subjective scores
+correlation_data3 <- cbind(subjecitve_data_illusion_corr[1:3],PCdata_corr[3])
+
+colnames(correlation_data3) <- c('PID','Condition','Illusion Score','Percentage Change') 
+
+pdf('Figures/correlationdata3.pdf', width = 12, height = 11)
+  ggscatter(correlation_data3, x = "Illusion Score", y = "Percentage Change", 
+          facet.by = "Condition",
+          panel.labs = list( Condition=c( "NI","NIT","MS","UV") ),
+          #add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "spearman",
+          cor.coef.size = 8,
+          xlab = "Subjecitve Illusion Score", ylab = "Pain Percentage Change") +
+    theme(text = element_text(size = 20))
+          
+dev.off()
+
+```
+
+# Abstract
+
+Current pharmaceutical interventions for chronic pain are reported to be minimally effective, leading researchers to investigate non-pharmaceutical avenues for chronic pain treatment. One such avenue is resizing illusions delivered using augmented reality. These illusions resize the affected body part through stretching or shrinking manipulations and have been shown to give analgesic effects; however, the neural underpinnings of these illusions remain undefined. Steady-state evoked potentials (SSEPs) have been studied within populations without chronic pain undergoing hand-based resizing illusions, finding slight decreases in SSEP amplitudes during illusory stretching. Here, we present comparable findings from a sample with chronic pain also showing slight decreases in SSEP amplitude during illusory stretching. However, no significant differences in pain ratings were found following illusory resizing, likely due to the experimental set up itself causing a significant increase in pain. Despite a lack of illusory analgesia across the sample, several participants experienced clinically meaningful levels of pain reduction following illusory resizing, meaning that the associated reduction in SSEP amplitude could reflect neural mechanisms involved in experiences of illusory analgesia.
+
+# Introduction
+
+Chronic pain is classified as pain that lasts or reoccurs for more than 3 months [@merskey1986a; @nice2021a], and is the leading cause of disability globally [@vos2017a]. Current pharmaceutical interventions for chronic pain conditions are minimally effective, with treatments having ill-defined long-term effects [@altman2000a], and often being no more effective than placebo at reducing pain or improving functionality [@meenagh2004a; @heyworth2008a]. Many drugs prescribed for pain result in around 60% of patients reporting no pain improvement or adverse effects [@dworkin2010a; @corriger2022a]. Surgical interventions to reduce chronic pain can result in up to 34% of patients reporting unfavourable pain outcomes [@beswick2012a]. Due to current treatments being largely ineffective, there is a clear need to find a non-pharmaceutical and non-surgical option for chronic pain treatment. 
+
+Individuals who live with chronic pain could have a cortical misrepresentation of their body and its incoming somatosensory signals, including pain, along with perceptual size dysfunctions of their affected limbs, which underpin their persistent pain [@boesch2016a]. There is often reported a lack of concordance between radiographic (physical damage) and symptomatic pain [@szebenyi2006a; @felson2005a]. This highlights the likelihood of a cortical misrepresentation driving pain rather than structural damage, explaining why surgical interventions to treat structural elements of chronic pain could be ineffective. Theories underlying cortical misrepresentations are the predictive coding account [@friston2008a] and the central sensitisation theory @arendt-nielsen2003a; @arendt-nielsen2010a]. Predictive coding posits that any mismatch between predicted and actual sensory inputs, such as the difference between peripheral signals and symptomatic pain, generates prediction errors. A lack of updating of top-down expectations in individuals with chronic pain, could lead to constant mismatches between symptomatic and radiographic sensory inputs. Central sensitisation theory, however, refers to the central nervous system changing, distorting, or amplifying pain in a way that no longer reflects the peripheral input from the body, leading to pain becoming an illusory perception [@woolf2011a]. Central sensitisation and predictive coding theories are not positioned in opposition to each other, but rather both contribute to the overall understanding of potential causes of chronic pain conditions. Both theories support the suitability of illusion therapies for the amelioration of chronic pain, as bodily illusions can induce perceptual modulations of the painful body part, altering the patient’s perception of their body and the pain related to it.  
+
+Illusory resizing is a bodily illusion which changes the way a body part is perceived, exploiting principles of multisensory integration to elicit modulations in the perceived size and shape of the body part [@preston2011a; @preston2020a; @stanton2018a]. Multisensory resizing illusions typically involve both tactile and visual inputs and can be delivered via an augmented reality system. Augmented reality can present real-time video capture of a hand, from the same position and perspective as if the hand were being viewed directly [@preston2011a], allowing the experimenter to deliver tactile manipulations, such as gently pulling the hand / fingers, whilst the participant views their hand / fingers stretching in the augmented image. @newport2010a found strong embodiment using multisensory visuotactile illusions, and our recent work [@hansford2023a] found that multisensory illusions elicited significantly greater illusory experience compared to non-illusion conditions. Regarding unimodal visual illusions, which consist of visual input of the finger stretching but without any tactile input, mixed results have been found with inconsistencies reported in illusory experience. Some participants show quite high illusory experiences during unimodal visual presentations, whilst others report no experience of illusory stretching [@hansford2023a; @hansford2024c]. Previous research has found a reduction in hand and knee pain in osteoarthritis (OA) patients using augmented reality to deliver multisensory resizing illusions [@preston2011a; @preston2020a; @stanton2018a], therefore both multisensory and unimodal visual resizing illusions are delivered in the present study to assess if illusory experience is required for illusory analgesia. 
+
+There are two main theories underlying analgesic resizing illusions. Firstly, the somatosensory blurring hypothesis posits that the cortical representation of a painful body part is blurred, and viewing the body part sharpens this representation. This is supported through findings from participants without chronic pain, where visual analgesia has been found following experimentally induced pain [@haggard2013a]. The second theory stems from research by @gilpin2015a, finding that participants with arthritis make smaller hand judgements compared to those without the condition, suggesting a reduced cortical representation of their hands. Pain reductions have been found for participants with arthritis when using stretching resizing illusions [@preston2011a], therefore, @gilpin2015a posit that increasing cortical representation of the hands through magnifying (stretching) could reduce pain. Both theories predict that cortical misrepresentations occur at the somatosensory cortex, with both theories predicting different neural changes regarding the experience of pain. Specifically, the somatosensory blurring hypothesis predicts a larger, more diffuse representation of the painful body part that would be reduced (sharpened) during resizing illusions, whereas the magnification theory predicts a shrunken representation of the painful body part that would be enlarged following illusory stretching.
+
+Somatosensory cortex modulation has been investigated using steady-state evoked potentials (SSEPs), where low-level somatosensory responses can be induced directly using vibrations of a known frequency applied to a body part. These generate a frequency-locked steady-state evoked potential detectable at the scalp using EEG [@snyder1992a; @tobimatsu1999a], and are an index of the cortical response to a stimulus, therefore can give an index of cortical response changes during illusory resizing. Our previous work [@hansford2024c] has found steady-state response decreases when participants without chronic pain undergo resizing illusions, however effects were too small to detect beyond omnibus statistics. Since people with chronic pain are thought to have cortical misrepresentations of their affected body parts, it is plausible that using the same paradigm as in our previous work, we might see greater differences in somatosensory response to illusory stretching in a population with chronic hand-based pain. SSEP responses can therefore be used to directly compare the somatosensory blurring hypothesis [@haggard2013a] and the magnifying hypothesis [@gilpin2015a], as an increased SSEP response following illusory resizing could indicate support for the magnification hypothesis, suggesting increased cortical representation of the painful body part, whereas a smaller SSEP response after illusory resizing could support the somatosensory blurring hypothesis, suggesting the cortical representation of the body part has become sharpened. 
+
+Using different sensory manipulations of finger resizing illusions, in addition to using an electromagnetic solenoid stimulator to elicit SSEPs, this study aimed to investigate subjective illusory experience and neural responses to resizing illusions in participants with chronic hand-based pain. To test this, different resizing illusions consisting of multisensory (visuotactile) stretching (MS), unimodal-visual stretching (UV), a non-illusion control condition without tactile input (NI), and a non-illusion control condition with tactile input (NIT) were used. Previous research has suggested that tactile input alone can reduce pain ratings [@mancini2014a; @nahra2003a], therefore this second control condition was used to demonstrate if the illusion itself delivered analgesia rather than the tactile or combined sensory inputs. The first hypothesis, acting as a positive control (1), was that there would be a greater illusory experience, measured via a subjective illusory experience questionnaire, in the MS condition compared to the NI and NIT conditions. The main experimental hypothesis was that (2) there would be a significant difference in SSEP response when comparing (2a) MS illusory resizing to the NI condition, when comparing (2b) UV illusory resizing to the NI condition, but no difference when comparing (2c) the NIT condition to the NI condition. The final hypothesis was that (3) there would be a reduction in pain, measured via a 21-point numeric rating scale, comparing before and after scores for (3a) MS and (3b) UV conditions, whilst we expected (3c) no reduction of pain following the NI condition, nor (3d) a reduction of pain following the NIT condition.
+
+# Methods
+
+## Sample Size
+
+Based on power analyses in section 2.5, a sample size of 30 participants was aimed for to adhere to the higher end of sample size estimates (Hypothesis 2 (2.5.2)). However, due to scarcity of participants experiencing pain in either their right index or middle fingers (digits needed for the delivery of vibrotactile and illusory manipulations, see section 2.2 Sample inclusion / exclusion criteria), a final sample size of 21 participants were tested after an 8-month recruitment period.
+
+## Participants
+
+Ethical approval was gained from the Department of Psychology, University of York (ethics application code 950), in line with the Declaration of Helsinki. Informed consent from each participant was gained prior to the start of any experimental set up, and participants were instructed that they could withdraw their participation at any time during or after completion of the experiment. 
+
+Sample inclusion / exclusion criteria:
+
+Inclusion and exclusion criteria were determined using self-report responses relating to each item listed below:
+-	Inclusion Criteria: Right-handed, over 18 years of age, must have ongoing or reoccurring pain in their right index or middle fingers (or their associated joints) for more than 3 months, hand-based pain present on day of testing. No formal diagnosis of a chronic pain condition is needed, as this has been found to be a barrier for participants taking part in non-pharmaceutical chronic pain research studies, especially for individuals from ethnic minorities [@hansford2024a]. 
+
+-	Exclusion Criteria: Prior knowledge or expectations about the research, a history of developmental, neurological or psychiatric disorders, history of drug or alcohol abuse, history of sleep disorders, history of epilepsy, visual abnormalities resulting in complete visual occlusion, being under 18 years of age, diagnosed with Complex Regional Pain Syndrome. No restrictions applied regarding any medication the participant might be taking. (Complex Regional Pain Syndrome is excluded as a chronic pain condition here, due to research showing increasing pain after stretching illusions [@moseley2006a]). 
+
+Raw data exclusion criteria:
+
+-	Less than 100% of the experiment completed by a participant, more than 50% of electrodes for a single participant requiring removal from EEG data, or if both electrodes F1 and FC1 (electrodes of interest) require removal. More information about data removal can be found in section 2.4.1 Preprocessing Steps. 
+
+
+## Experimental Procedure
+
+All participants filled out a demographic survey, asking their age, sex, ethnicity, and any chronic pain condition diagnosis, and were asked to complete the revised Waterloo Handedness Questionnaire (WHQr) [@elias1998a]. The WHQr self-reported handedness questionnaire consisted of 36 questions. The questions were answered on a 5-level Likert scale to determine the degree of preferred hand use, with left always being -2, left usually being -1, equal use being 0, right usually being +1 and right always being +2. The sum of the total WHQr score was then used to categorise a respondent as left-handed (score of -24 or less), mixed handed (score of -23 to +23), or right-handed (score of +24 or higher). Only participants who were categorised as right-handed continued participation, with the exception of one participant who scored a result of mixed handed due to changes in hand use as a result of pain. Participants were asked their pain score on the day of testing for their digit in the most pain using a 21-point numeric rating scale (NRS) (0 = no pain at all; 20 = most severe pain imaginable). This 21-point scale has equivalent reliability to a more frequently used 11-point scale [@jensen2011a] and was chosen to aid comparability with previous studies which have used the 21-point NRS [@preston2011a; @preston2020a]. Additionally, since the scale is different to a typical rating scale of 1-10, participants would be more likely to think about the answer they give, rather than giving a number they always use when asked to rate their pain on a scale of 1-10. Participants were only tested if their pain on the day was above 0 on the 21-point scale. 
+
+Participants were then set up with an appropriately sized 64-channel EEG cap with electrodes arranged according to the 10/20 system. The experimenter used conductive gel to make a conductive bridge between the electrodes and the scalp to attempt to obtain impedance levels of <10kΩ per electrode. Data were collected using an ANT Neuroscan system, sampling at 1kHz. The whole head average was used as a reference.
+
+::: {#fig-ar}
+
+![](Figures/Augmented Reality System.png)
+
+Schematic of Augmented Reality System with Tactile Stimulator.
+:::
+
+
+Participants were then seated behind the augmented reality system (Figure 1) and instructed to place their hand onto the black felt fabric within the augmented reality system. Within the self-built system there was a 1920 x 1080-pixel Spedal Webcam Wide Angle Camera at the edge of the black felt on the side the participant sits, away from the participant’s view. 26cms above the felt base, there was a mirror, which was placed 26cms below a screen with a resolution of 1920 x 1200 pixels, with a width of 52cms and a height of 32cms. The thickness of section on which the mirror sat was 2cms. This screen was 54cms from the base of the system, and the base of the system was 82cms from the ground. Participants were instructed to place either their right index or middle finger outstretched onto the felt. The decision of whether the participant used their index or middle finger was pseudo randomised (to give equal representation of each finger) via MATLAB prior to any participants taking part. There were two white dots for each hand on the felt and participants were instructed to place their hand between these two dots. Participants were instructed to view their hand’s image in the mirror (whilst the real hand was hidden from view) throughout the experiment. The camera placed underneath the mirror on the felt base was used to deliver a live feed video of the participant’s hands to the computer screen at the top of the augmented reality system, which showed in the mirror reflection to the participants. There was a delay of 170ms in the video processing pipeline from the camera image to the augmented video image.
+
+Participants underwent 4 conditions: multisensory stretching (MS), unimodal-visual stretching (UV), a non-illusion control condition without tactile input (NI), and a non-illusion control condition with tactile input (NIT). There was vibrotactile stimulation to the finger in all conditions, but only tactile input of the researcher touching the participants finger in the MS and NIT conditions. Each trial lasted 2.4 seconds for the manipulation phase, where the finger was stretched by 60 pixels (2.1 centimetres) in UV and MS conditions, followed by a further 2.4 second habituation phase in which participants could view and move their (augmented) finger, whilst they keep the rest of their hand still, before the screen went dark, indicating that the next trial could start. The MS condition consisted of the researcher touching and pulling the participant’s finger as the participant viewed their finger stretching in a congruent manner. The UV condition consisted of the participants viewing their finger stretch without any experimenter manipulation. The NI condition provided no visual or touching tactile manipulations to the finger, the image of their finger was visible and unchanged throughout. The NIT control condition involved no visual input of the finger stretching, again the image of their finger was visible but unchanged. Additionally, this condition included tactile input of the experimenter’s hand touching the participant’s finger, but without pulling. Visualisation of all conditions can be seen in Figure 2.
+
+::: {#fig-cond}
+
+![](Figures/Conditions.png)
+
+Infographic of Experimental Conditions. MS = Multisensory Stretching, UV = Unimodal Visual Stretching, NIT = Non-Illusion Tactile, NI = Non-Illusion. During the manipulation phase (2.4 seconds) the visual image of the finger is stretched in the MS and UV conditions, and/or the experimenter provides tactile input (touch) in the MS and NIT conditions. The tactile input in the MS condition is accompanied by pulling.  During the habituation phase (2.4 seconds) participants are free to move their finger. The arrow denotes the direction of the experimenter’s action. The vibrotactile stimulator is depicted on the finger in each phase of the experiment as vibrations are presented throughout.
+:::
+
+The experimenter was seated opposite the participant, the other side of the augmented reality machine and touched the digit during MS and NIT conditions by holding onto the distal interphalangeal joint and gently touching (NIT) or pulling (MS) the finger whilst the participant kept their hand in place. Conditions were delivered across 4 blocks, with each block consisting of 24 trials of the same experimental condition, totalling 96 trials over all 4 blocks. The ordering of the blocks was randomised for each participant to prevent ordering effects. The experiment was programmed in, and the conditions randomised using MATLAB R2017a and the experimenter was informed of whether to pull the finger or to touch the finger via an indicative box displayed on the screen out of the participant’s view. If the box was blue, this indicated a need to pull the finger, if it was white it indicated a need to touch the finger, if there was no box displayed then this indicated no tactile manipulation from the experimenter. The researcher used a button press to trigger the start of the manipulation, and started pulling the finger, when needed, synchronously within the 2.4 second manipulation phase. If the experimenter were to forget to pull the finger on a multisensory condition, or mistakenly pulled the finger in a control trial, then this would noted during the experiment, and that trial would be removed from analysis. Fortunately, no trials needed removal due to experimenter error. Vibrations were delivered to the participant’s finger in all conditions using a miniature electromagnetic solenoid stimulator (Dancer Design Tactor; diameter 1.8mm) emitting vibrations produced by sending amplified 26Hz sine wave sound files, with stimulus intensity controlled by an amplifier (Dancer Design TactAmp). The tactor was driven at 50% of the maximum (i.e. a peak input voltage of 3V) using a 26Hz sine-wave, and delivered a peak force of 0.18N. The electromagnetic solenoid stimulator was attached to the participant’s finger that was outstretched to receive the manipulations, between the knuckle and the first finger joint, using clear medical tape and gave continuous stimulation for the duration of each trial. Participants were asked before each condition block and then again immediately after each condition block to rate their pain on the 21-point NRS, which was a verbal report that the experimenter inputted onto a Samsung Galaxy A6 Tablet, resulting in 4 pre and 4 post block pain reports per participant. Participants were encouraged to take a break between each of the blocks to stretch their hand. EEG was recorded throughout as a continuous recording with trials and conditions denoted by numbered 8-bit digital at the start of each trial (USB-TTL Module, Black Box Toolkit Ltd.). 
+
+Finally, at the end of each block, the participant was asked to complete a subjective illusory experience questionnaire regarding a condition presented in a given block using a Samsung Galaxy Tab A6 tablet via a questionnaire on Qualtrics (Qualtrics, Provo, UT). The questionnaire consisted of six questions relating to the trials the participant had just experienced. Two statements related to illusory experience: “It felt like my finger was really stretching” / “It felt like the finger I saw was part of my body”, two related to disownership: “It felt like the finger I saw no longer belonged to me” / “It felt like the finger I saw was no longer part of my body”, and two were control questions: “It felt as if my finger had disappeared” / “It felt as if I might have had an extra finger” (all questions were directed towards the participants manipulated finger). Control questions were included to create an index for the illusion and disownership questions (more detail can be found in section 2.4.1 - Preprocessing steps), whilst disownership questions were included to assess if the potential experience from the illusions resulted from a disownership of the body part, or from subjective embodiment of the body part [@mccabe2011a]. A visual analogue scale from 0 – 100 was used for each statement, with 0 being strongly disagree, 50 being neutral and 100 being strongly agree. 
+
+Data collection was terminated after 8 months of recruitment. If a participant needed over 50% of the electrodes removed during preprocessing, or if either electrode F1 or FC1 needed removal, then their data was not included for SSEP analysis, which was the case for one participant. Due to difficulties recruiting participants with hand-based pain affecting the right index and/or middle digits, no additional participants were recruited to replace lost data.
+
+## Analysis Pipeline
+
+### Preprocessing Steps
+
+EEG data were first converted using MATLAB and EEGlab from the ANT EEprobe .cnt format to EEGlab .set format. All subsequent analysis was then conducted using the MNE-Python toolbox [@gramfort2013a]. A 50Hz notch filter was first applied to the raw EEG data for all electrodes, followed by calculation of the standard error across time for each electrode for each participant [@luck2021a]. Across the standard errors for all participants, the 5% of electrodes which showed the largest standard errors were used to create a standard error threshold. Any electrode with a standard error above this threshold, or with a value of 0, was removed from analysis. Where a participant had over 50% of their electrodes over the standard error threshold or with a value of 0, or if the electrodes requiring removal included either electrodes F1 or FC1 (electrodes of interest), then their data was removed. Primary analysis of the remaining EEG data then involved averaging the signal across the electrodes of interest (or using just electrode F1 or FC1 in case of electrode removal), and calculating the Fourier transform for each trial per participant. These amplitudes were then averaged across trials to give overall results for each participant. Statistical comparisons were then performed on the Fourier amplitudes at the stimulation frequency (26Hz), across conditions and participants. No additional filtering or denoising steps were applied to the EEG data, in line with @figueira2022a report that only a Fourier transform is typically needed for this type of EEG data.
+
+Regarding questionnaire data, scores for both illusion experience questions were combined to give median scores, along with both disownership questions and both control questions, resulting in 3 median scores per condition per participant. The median control scores were used to create an index of the illusion and disownership scores by subtracting the median control score from the median illusion and median disownership scores, in line with previous research doing similarly [@matsumiya2021a; @kilteni2017a; @kalckert2012a]. The normalised (baseline corrected) data were used for analyses, with a new scale from -100 to +100 with 100 indicating strongly agree, 50 indicating a neutral opinion, and scores below 0 indicating strongly disagree with the statements on the questionnaire. 50 is maintained as a neutral opinion so that the normalised data still adhered to the thresholds that the participants were presented with during the experiment. 
+
+8 data points were collected per participant for their pain ratings. Median scores were then calculated across pain data for pre and post scores for all experimental conditions.
+
+## Power Analyses & Analysis Plans
+
+### Hypothesis 1 (Positive Control)
+
+*(1 – Positive Control) There will be a greater illusory experience, measured via a subjective illusory experience questionnaire, in the (1a) MS condition compared to the NI condition and in the (1b) MS condition compared to the NIT condition.* 
+
+The subjective illusory experience questionnaire was  used as a positive control for the current study. Previous research has shown significantly greater illusion strength for MS conditions compared to non-illusion conditions [@carey2019a; @hansford2023a; @hansford2024a], which we attempted to replicate. Questionnaire data was analysed using R (R Core Team, 2021), in line with preregistered anlaysis plans (https://osf.io/9anjc).
+
+Effect sizes were determined by research from Hansford et al (2023a) using the subjective illusory experience questionnaire and comparing MS, UV, and incongruent finger-based resizing illusions to control conditions with no illusory resizing, using the same finger stretching illusions and the same equipment (n = 48), which showed an effect size of $\eta^2$ = .33 (converted to a Cohen’s f = .70). Additional effect size information came from a visual capture study (n = 80) using a subjective embodiment questionnaire and visual and tactile manipulations to a mannequin body [@carey2019a], showing an effect size of r = .64 (converted to a Cohen’s f = .83) when comparing embodiment scores from the questionnaire against control scores. An effect size of f = .70 was used for hypothesis 1 to adhere to the lower end of previous effect sizes. 
+
+A priori power analysis using G\*Power for the smallest effect size of interest (f = .70) showed that for a repeated measures, within factors one way ANOVA, with an effect size (f) of 0.70, alpha of 0.05, power at 90% and 1 group with four measurements, 6 participants were needed.
+
+
+### Hypothesis 2
+
+*There will be a significant difference in SSEP response across the electrodes of interest (F1 & FC1) when comparing (2a) the MS condition to the NI condition, when comparing (2b) the UV condition to the NI condition, but (2c) that there will be no significant difference when comparing the NIT condition to the NI condition.*
+
+As mentioned in the EEG pre-processing steps in section 2.4.1, EEG data analysis involved taking a Fourier transform for each waveform averaged across the electrodes of interest, to obtain the amplitude for each trial at the vibration frequency (26Hz). These amplitudes were then averaged across trials to give overall results for each participant, before following preregistered analysis plans (https://osf.io/9anjc). Based on the pilot data in Figure 3, we expected to see activation most pronounced over mid-frontal distributions, covering F1 and FC1 electrodes and therefore these electrodes were selected as the electrodes of interest. 
+
+Despite our previous work using SSEPs to assess somatosensory response changes during illusory finger stretching, this was the first study to investigate illusory finger stretching using SSEPs in a chronic pain sample, so appropriate effect size estimates were not available. We therefore conducted power calculations based on a smallest effect size of interest, in line with the recommendation of @lakens2014a. Here, we chose an effect size of d = 0.5 (a medium effect, see Cohen, 1988), since this is the smallest effect size we were interested in detecting, which converted to a Cohen’s f of 0.25 for power analyses. 
+
+A priori power analysis using G\*Power showed that for a repeated measures, within factors one way ANOVA, with an effect size (f) of 0.25, alpha of 0.05, power at 90%, and 1 group with four measurements, a total sample size of 30 participants was needed. 
+
+### Hypothesis 3
+
+*We expect to find a subjective reduction in pain, measured via a 21-point numeric rating scale, comparing before and after scores for (3a) MS and (3b) UV conditions whilst we expect (3c) no reduction of pain following the NI condition, nor (3d) a reduction of pain following the NIT condition.*
+
+Pain data were also analysed using R (R Core Team, 2021) following preregistered analysis plans (https://osf.io/9anjc). Comparisons of the MS and the NIT conditions assessed whether any reduction in pain was due to the illusory manipulations or rather, due to the addition of tactile input. 
+
+Effect size was determined using those listed in previous research using the 21-point numeric pain rating scale [@preston2020a] and from previous pilot data using the same MS resizing illusions for analgesic effect, finding post illusion pain scores to be significantly lower than pre illusion scores (t(10)=3.32, p = .008, d = 1.0). 
+
+A priori power analysis using G\*Power showed that for a Wilcoxon signed-rank test (one-sided, matched pairs), with an effect size (dz) of 1, alpha of 0.05, and power at 90%, for a two tailed test with normal parent distribution, 11 participants were needed in total.
+
+# Results
+
+Positive control analyses of the subjective illusion data can be seen in @fig-illusion. A Friedman test found a significant overall effect of condition with a moderate effect size ($\chi^2$(`r round(res.fried_illusion$df[1],digits = 2)`) = `r round(res.fried_illusion$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_illusion$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_illusion$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined illusion score in the Multisensory Stretching (MS) condition (M = `r round(illusionmsds$median[3],digits = 2)`, SD = `r round(illusionmsds$sd[3],digits = 2)`) compared to the Non-Illusion (NI; M = `r round(illusionmsds$median[1],digits = 2)`, SD = `r round(illusionmsds$sd[1],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`) and Non Illusion Tactile (NIT; M = `r round(illusionmsds$median[2],digits = 2)`, SD = `r round(illusionmsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[4], digits = 1, eps = 0.001, nsmall = 3)`) conditions, thereby supporting hypotheses 1a and 1b and fulfilling the positive control checks. Exploratory analysis also showed a significant difference between the MS and Unimodal Visual (UV) condition (M = `r round(illusionmsds$median[4],digits = 2)`, SD = `r round(illusionmsds$sd[4],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`). 
+
+![Combined Illusion Scores Across Conditions. Scores below 50 indicate disagreement with experience of illusion statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/illusiondata.pdf){#fig-illusion}
+
+Exploratory analysis of subjective disownership and control data can be seen in Appendix B.
+
+Analyses of SSEP data can be seen in @fig-eeg1. The left panel (a) confirms the presence of a clear steady-state signal at 26Hz, which was strongest over fronto-central electrodes. A Friedman test found no significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_eeg1$df[1],digits = 2)`) = `r round(res.fried_eeg1$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_eeg1$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_eeg1$effsize[1],digits = 2)`), opposing Hypothesis 2. Despite the MS condition having numerically the lowest median amplitude (M = `r round(eegdatamsds$median[3],digits = 2)`, SD = `r round(eegdatamsds$sd[3],digits = 2)`), post hoc Wilcoxon tests with Holm corrections found no significant differences between SSEP amplitude when comparing the NI condition (M = `r round(eegdatamsds$median[1],digits = 2)`, SD = `r round(eegdatamsds$sd[1],digits = 2)`) to the MS condition (*p* = `r format.pval(nppwc_eeg1$p.adj[1], digits = 1, eps = 0.001, nsmall = 3)`), or the UV condition (M = `r round(eegdatamsds$median[4],digits = 2)`, SD = `r round(eegdatamsds$sd[4],digits = 2)`, *p* = `r format.pval(nppwc_eeg1$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`), meaning Hypotheses 2a and 2b were unsupported. There was no significant difference found when comparing the NI condition to the NIT condition (M = `r round(eegdatamsds$median[2],digits = 2)`, SD = `r round(eegdatamsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_eeg1$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`), supporting Hypothesis 2c. 
+
+::: {#fig-confirmeeg layout-valign="bottom" layout="[[48,-4,48], [100]]"}
+
+![](Figures/spectrum.pdf){#fig-spectrum1}
+
+![](Figures/eegdata.pdf){#fig-eeg1}
+
+(a): SSEP Amplitude Spectra Across Conditions for electrodes of interest (F1 & FC1). Shading shows ±1 standard error across participants. (b): SSEP Amplitudes Across Conditions. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter.  
+:::
+
+Exploratory correlation analyses were conducted to assess the correlation between participant’s subjective illusion score and their SSEP amplitude across electrodes of interest (F1 & FC1) for each condition to see if those who experienced a stronger feeling of the illusion had more reduced SSEP amplitudes, results showed no significant correlations. Correlations were also run between participants pain percentage change and their SSEP amplitude across conditions, to assess if those experiencing a reduction in pain showed a lower SSEP amplitude, however no significant correlations were found. Finally, correlations were run across conditions comparing participant's pain percentage change data and their subjective illusion scores, also finding no significant correlations. All exploratory correlation analyses can be seen in Appendix C. 
+
+Analysis of pain data across conditions can be seen in @fig-pain. Wilcoxon tests found a significant increase in pain when comparing NI pre (M = `r round(NIpainmsds$median[2],digits = 2)`, SD = `r round(NIpainmsds$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds$median[1],digits = 2)`, SD = `r round(NIpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNI$statistic[1],digits = 2)`, *p* = `r format.pval(paintestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`). No significant differences were found when comparing NIT pre (M = `r round(NITpainmsds$median[2],digits = 2)`, SD = `r round(NITpainmsds$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds$median[1],digits = 2)`, SD = `r round(NITpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(paintestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), in line with our hypotheses. No differences in pain were found when comparing the MS pre (M = `r round(MSpainmsds$median[2],digits = 2)`, SD = `r round(MSpainmsds$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds$median[1],digits = 2)`, SD = `r round(MSpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestMS$statistic[1],digits = 2)`, *p* = `r format.pval(paintestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor the UV pre (M = `r round(UVpainmsds$median[2],digits = 2)`, SD = `r round(UVpainmsds$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds$median[1],digits = 2)`, SD = `r round(UVpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestUV$statistic[1],digits = 2)`, *p* = `r format.pval(paintestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`) levels, opposing our hypotheses. 
+
+![Pre and Post Pain Scores Across Conditions. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey. ](Figures/pain.pdf){#fig-pain}
+
+Despite finding no significant differences in pain levels for illusory conditions when conducting group level analyses, there were cases of pain reduction for each condition for individual participants. The MS condition resulted in `r num_instances_MSR` participants experiencing a reduction in pain, with `r num_instances_MS30` participants experiencing a reduction greater than 30%, which is described as a clinically meaningful level of pain reduction (Dworkin et al., 2018) and `r num_instances_MS50` greater than 50% (described as extremely meaningful). The UV condition resulted in `r num_instances_UVR` participants experiencing a reduction in pain, `r num_instances_UV30` of which experienced a reduction greater than 30% and `r num_instances_UV50` a reduction greater than 50%. These conditions saw more participants experience reductions in pain levels compared to the non-illusion conditions which saw only `r num_instances_NIR` participants experience a reduction in pain following the NI condition, `r num_instances_NI30` of which experienced a reduction greater than 30% and `r num_instances_NI50` a reduction greater than 50%, and `r num_instances_NITR` participants experience a reduction in pain following the NIT condition, with `r num_instances_NIT30` participants experiencing a reduction greater than 30% and `r num_instances_NIT50` participants experiencing a reduction greater than 50%. 
+
+@fig-painexp shows percentage change per participant per condition, showing some participants experiencing a reduction in pain levels along with some experiencing no change in their pain levels (NI: `r num_instances_NI0`, NIT: `r num_instances_NIT0`, MS: `r num_instances_MS0`, UV: `r num_instances_UV0`) and others showing increases in pain following each condition (NI: `r num_instances_NIG`, NIT: `r num_instances_NITG`, MS: `r num_instances_MSG`, UV: `r num_instances_UVG`). 
+
+![Percentage change for pain scores across all conditions per participant. Dashed lines show 30% pain reduction (clinically meaningful) and 50% pain reduction (extremely meaningful).](Figures/pain_exp.pdf){#fig-painexp}
+
+To assess if participants experiencing a reduction in pain differed between presentations of chronic primary and secondary pain conditions, data were analysed split by condition type and can be found in the Appendix D. No significant differences were found when comparing pre and post pain levels across any condition for either chronic primary or secondary pain. 
+
+# Discussion
+
+This study investigated subjective illusory experience and neural response to resizing illusions in participants with chronic hand-based pain to assess whether illusory resizing of the fingers would reduce pain levels and show differences in steady state responses to 26Hz vibrotactile stimulation across illusory conditions. Subjective results replicated previous findings in samples without chronic pain of a significantly greater experience of the illusion in the multisensory condition compared to both non-illusion conditions, with the unimodal visual condition showing a wider range of illusory experience responses. SSEP responses to 26Hz vibrotactile stimulation showed no significant differences in response amplitude across conditions opposing our hypothesis, with pain ratings also showing no significant differences when comparing pre and post levels for both illusory conditions, contrasting previous analgesic findings. 
+
+Our work delivering resizing illusions to participants without chronic pain [@hansford2024c], showed surprising effects of a significantly greater experience of the illusion in the multisensory condition compared to the unimodal visual condition, despite previous findings of visual capture alone being found to elicit embodiment in both virtual [@maselli2013a] and physical environments [@carey2019a], and when viewing an illusion of an elongated arm [@schaefer2007a] or from visual-only manipulations of the hand [@mckenzie2015a]. Previously, we found significantly greater levels of disownership during unimodal conditions compared to multisensory conditions and therefore posited that the tactile input of touching the hand / finger is needed to ground one’s experience of owning their body part within augmented reality. The present study replicated these findings of significantly heightened disownership levels during the unimodal visual conditions, further supporting the idea that tactile input grounding one’s experience could contribute to greater experiences of illusory stretching, regardless of the presence of a chronic pain condition. 
+
+The somatosensory blurring hypothesis [@haggard2013a] posits that the cortical representation of a painful body part could be blurred and through viewing the body part the representation could become sharpened, which could be the mechanism through which illusory stretching could induce illusory analgesia. Slight reductions in SSEP amplitude have been found before in participants without chronic pain undergoing hand-based resizing illusions [@hansford2024c], however since these participants did not experience chronic pain in their hands it was thought that their cortical representations might not be as blurred as those with chronic hand-based pain such as in the present study. Since no significant difference in SSEP response across resizing conditions were found, it is possible that illusory analgesia could be driven from an alternate mechanism. However, no significant differences in pain levels were found across illusory conditions, meaning SSEP amplitude reductions might not have been expected due to no observed group level illusory analgesia. Since some participants did experience illusory analgesia, exploratory correlations were run between participant’s pain percentage change and their SSEP response, to assess whether those experiencing a pain reduction had reduced SSEP amplitudes, however no significant correlations were found.
+
+It is possible that the lack of illusory analgesia seen across participants in the present study was due to the experimental set up. A significant increase in pain was found when comparing pain ratings before and after the non-illusion condition, with some participants commenting that during participation having their hand inside the augmented reality system was painful for their wrist and shoulder, meaning that they found it difficult to differentiate the pain they were experiencing from the set up itself compared to pain in their manipulated digit. Additionally, participants reported that the need to sit still for 5 minutes per condition block resulted in some additional pain which although reduced through rest breaks between blocks, could have influenced pain ratings taken immediately after a condition. 
+
+It is possible that the vibration elicited during each condition could have reduced participant’s pain through a process referred to as vibratory analgesia. Some studies have found vibration to produce up to a 40% reduction in pain intensity [@staud2011a], whereas others report no significant effects of vibration on pain levels [@watanabe1999a]. Due to the therapeutic potential of vibratory analgesia, vibrating gloves have been created as a therapeutic option for people with chronic hand-based pain and have been found to effectively reduce pain levels [@jamison2018a]. Within the present study, it is therefore possible that the 26Hz vibration could have reduced pain levels through vibratory analgesia, however, since vibration was present across all conditions and more participants reported pain reductions in the illusory conditions compared to the non-illusion conditions, it is clear that there were illusory analgesic effects observed beyond that induced by vibratory analgesia. 
+
+Although pain data analyses were conducted at the group level as preregistered, it is important to understand the individual experiences of participants within this sample. Simply because no overall reduction in pain levels were found following either resizing condition (MS or UV), this should not discount the illusory analgesia experiences that several participants reported. Figure 6 shows that a substantial proportion of participants experienced either a clinically or extremely meaningful level of pain reduction following these conditions, highlighting the potential of this therapy for day-to-day treatment. Similarly, however, those experiencing an increase in pain level should not be ignored, and It is therefore recommended that should illusory resizing be offered as a treatment for chronic hand-based pain, that it is not provided within a lab setting such as the current study, where significant increases in pain were found due to the experimental set up. Future research should assess the potential of mobile phone based illusory resizing, so that it can be delivered from the comfort of one’s home. Illusory resizing delivered through a mobile phone would not be able to deliver visuotactile illusions such as the one delivered in the multisensory condition here but could deliver unimodal visual or visual-auditory manipulations. Visual-auditory resizing illusions using a rising pitch tone as non-naturalistic auditory input have been found to increase illusory experiences compared to visual only manipulations [@hansford2023a], therefore both unimodal visual and visual-auditory presentations could be used to deliver meaningful analgesia for a substantial proportion of people living with chronic hand-based pain. 
+
+# Conclusions
+
+The present study adds to our understanding of the experiences of illusory resizing within a sample with chronic hand-based pain. The subjective data suggest that people living with chronic pain experience the illusion conditions similarly to those without chronic pain, highlighting the potential of these illusions as a therapeutic treatment avenue. SSEP data however, despite showing a reduction in median amplitude in the multisensory condition in line with the somatosensory blurring / sharpening hypothesis, did not show overall significant differences between conditions possibly due to the lack of illusory analgesia experienced for some within the sample. Pain data highlighted the individual nature of chronic pain, with group analyses showing no significant effects, but participant data showing strong experiences of both pain reduction and pain increases. This individuality was not underpinned by type of chronic pain, with both chronic primary and secondary pain condition subgroups showing no significant differences in pain percentage change. These nuances of chronic pain experiences must be considered when designing therapies for pain alleviation, to ensure people understand how varied analgesic effects from resizing illusions can be. 
+
+{{< pagebreak >}}
+
+# Appendix A
+
+# Pilot Data
+
+Previous literature stated that the ideal vibration frequency to use to elicit somatosensory SSEPs is approximately 26Hz (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016; Snyder, 1992).  Due to resizing illusions often manipulating the index finger, and previous studies using the index finger supporting around 26Hz as an optimal frequency (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016), it was hypothesised that 26Hz would elicit a dependable somatosensory SSEP response. Therefore, we ran a pilot study to check that our setup and equipment can reliably elicit and record a somatosensory SSEP at 26Hz, using the resizing illusion and EEG.
+
+Pilot data were collected for 3 healthy participants. Participants underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, minus the subjective illusory experience questionnaire. A Fourier transform was calculated for each waveform at each electrode for all conditions, and then averaged across repetition to obtain individual results. These were then averaged across all 3 participants to give the result seen in Figure 8. 
+
+As can be seen in Figure 8, there was a clear somatosensory SSEP response at 26Hz, which was strongest around electrodes F1 and FC1. Previous research using vibrotactile stimulation at 21Hz have also found the scalp topography of the activation to be most pronounced over mid-frontal distributions (Porcu et al., 2014; Timora & Budd, 2018), in line with the scalp topography seen here. Given these finding of a distinct 26Hz signal and mid-frontal scalp location, it appeared appropriate for 26Hz to be used as the vibration frequency in the current study. 
+
+![Averaged Pilot Data showing peak frequency at 26Hz, centred between electrodes F1 and FC1. The spectrum is derived from electrode FC1. Saturation bar represents signal to noise ratio (SNR).](Figures/Pilot Data 2.png){width=50%, height=50%}
+
+{{< pagebreak >}}
+
+Pilot data were also collected using the vibrotactile stimulator at 26Hz to make sure that the illusory experience is not affected by the addition of vibrotactile input. Pilot data were collected from 4 additional healthy participants, who underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, but without EEG caps fitted. Illusory experience was calculated using the median of both illusion scores for each participant minus their median control scores, as per the preprocessing steps regarding the control index, and then the data were averaged over participants to give the results seen in Figure 9. As can be seen, there is a greater subjective experience of the resizing illusion, indexed by participant’s illusion score, in both experimental conditions (UV average = 64.25; MS average = 67.88) compared to both control conditions (NI average = 32.38; NIT average = 24.13). Scores below 50 are indicative of disagreement of experience of the illusion, whilst a score of 50 is a neutral option regarding the illusion experience, and scores above 50 are indicative of agreement of experiencing the illusion. This therefore shows that the experience of illusory resizing was maintained when vibrotactile stimulation was added to the procedure and can therefore be used in the current study to elicit somatosensory SSEPs without affecting the subjective illusory experience of the resizing illusion. 
+
+![Averaged Illusion score for each condition. Error bars represent standard errors. NI represents the non-Illusion condition, NIT refers to the non-illusion tactile condition, UV refers to the unimodal-visual condition, and MS refers to the multisensory condition.](Figures/Pilot Data 3.png){#fig-pilot3}
+
+{{< pagebreak >}}
+
+# Appendix B
+
+# Subjecitve Disownership and Control Analyses:
+
+Exploratory analyses of the subjective disownership data using a Friedman test found a significant overall effect of condition with a small to moderate effect size ($\chi^2$(`r round(res.fried_disownership$df[1],digits = 2)`) = `r round(res.fried_disownership$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_disownership$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_disownership$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined disownership score in the UV condition (M = `r round(disownershipmsds$median[4],digits = 2)`, SD = `r round(disownershipmsds$sd[4],digits = 2)`) compared to the NI (M = `r round(disownershipmsds$median[1],digits = 2)`, SD = `r round(disownershipmsds$sd[1],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`), NIT (M = `r round(disownershipmsds$median[2],digits = 2)`, SD = `r round(disownershipmsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[5], digits = 1, eps = 0.001, nsmall = 3)`), and MS conditions, (M = `r round(disownershipmsds$median[3],digits = 2)`, SD = `r round(disownershipmsds$sd[3],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`).
+
+![Combined Disownership Scores Across Conditions. Scores below 50 indicate disagreement with experience of disownership statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/disownershipdata.pdf){#fig-disownership}
+
+{{< pagebreak >}}
+
+Exploratory analyses of the subjective control data using a Friedman test found a significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_control$df[1],digits = 2)`) = `r round(res.fried_control$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_control$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_control$effsize[1],digits = 2)`). Post hoc Wilcoxon tests with Holm corrections for multiple comparisons found a significant difference between NI and UV control scores (*p* = `r format.pval(nppwc_control$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`) however found no significant differences between control scores across any other condition: NI (M = `r round(controlmsds$median[1],digits = 2)`, SD = `r round(controlmsds$sd[1],digits = 2)`), NIT (M = `r round(controlmsds$median[2],digits = 2)`, SD = `r round(controlmsds$sd[2],digits = 2)`), MS (M = `r round(controlmsds$median[3],digits = 2)`, SD = `r round(controlmsds$sd[3],digits = 2)`), UV (M = `r round(controlmsds$median[4],digits = 2)`, SD = `r round(controlmsds$sd[4],digits = 2)`).
+
+![Combined Control Scores Across Conditions. Scores below 50 indicate disagreement with experience of control statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/controldata.pdf){#fig-control}
+
+{{< pagebreak >}}
+
+# Appendix C
+
+# Correlation Analyses:
+
+Spearman’s correlations were run to identify any correlations between (1) participant’s illusion score and their SSEP amplitude, (2) participant's pain percentage change and their SSEP amplitude, and (3) participant's subjective illusion scores and their pain percentage change, finding no significant correlations across any analyses.
+
+![Correlation Between Amplitude and Subjective Illusory Score for Each Condition.](Figures/correlationdata.pdf){#fig-correlation}
+
+![Correlation Between Amplitude and Pain Percentage Change for Each Condition.](Figures/correlationdata2.pdf){#fig-correlation2}
+
+![Correlation Between Pain Percentage Change and Subjective Illusory Score for Each Condition.](Figures/correlationdata3.pdf){#fig-correlation3}
+
+{{< pagebreak >}}
+
+# Appendix D
+
+# Pain Condition Subgroup Analyses:
+
+Since this sample consisted of participants with both primary and secondary chronic pain conditions, data were analysed split by either primary or secondary pain condition and can be seen in the figures below. Chronic primary pain is plotted in magenta, chronic secondary pain is plotted in green, and participants with either no diagnosis or a mix of primary and secondary pain conditions are plotted in grey.
+
+Regarding chronic primary pain conditions, Wilcoxon tests found no significant differences when comparing NI pre (M = `r round(NIpainmsds1$median[2],digits = 2)`, SD = `r round(NIpainmsds1$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds1$median[1],digits = 2)`, SD = `r round(NIpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNI$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`), nor when comparing NIT pre (M = `r round(NITpainmsds1$median[2],digits = 2)`, SD = `r round(NITpainmsds1$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds1$median[1],digits = 2)`, SD = `r round(NITpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), MS pre (M = `r round(MSpainmsds1$median[2],digits = 2)`, SD = `r round(MSpainmsds1$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds1$median[1],digits = 2)`, SD = `r round(MSpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestMS$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor UV pre (M = `r round(UVpainmsds1$median[2],digits = 2)`, SD = `r round(UVpainmsds1$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds1$median[1],digits = 2)`, SD = `r round(UVpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestUV$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`).
+
+![Pre and Post Pain Scores Across Conditions for Participants with Chronic Primary Pain. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey.](Figures/pain_cond1.pdf){#fig-painc1}
+
+No differences in pain levels were found for chronic secondary pain conditions when comparing NI pre (M = `r round(NIpainmsds2$median[2],digits = 2)`, SD = `r round(NIpainmsds2$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds2$median[1],digits = 2)`, SD = `r round(NIpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNI$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`), nor when comparing NIT pre (M = `r round(NITpainmsds2$median[2],digits = 2)`, SD = `r round(NITpainmsds2$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds2$median[1],digits = 2)`, SD = `r round(NITpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), MS pre (M = `r round(MSpainmsds2$median[2],digits = 2)`, SD = `r round(MSpainmsds2$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds2$median[1],digits = 2)`, SD = `r round(MSpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestMS$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor UV pre (M = `r round(UVpainmsds2$median[2],digits = 2)`, SD = `r round(UVpainmsds2$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds2$median[1],digits = 2)`, SD = `r round(UVpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestUV$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`).
+
+![Pre and Post Pain Scores Across Conditions for Participanta with Chronic Secondary Pain. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey.](Figures/pain_cond2.pdf){#fig-painc2}
+
+![Percentage change for pain scores across all conditions per participant. Dashed lines show 30% pain reduction (clinically meaningful) and 50% pain reduction (extremely meaningful). Bars showing in magenta show participants with chronic primary pain, green for those with chronic secondary pain, and grey for particpants with either no diagnosis or a mix of primary and secondary pain conditions.](Figures/pain_expc.pdf){#fig-painexpc}
+
+
+# References
+
