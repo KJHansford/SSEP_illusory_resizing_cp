@@ -511,6 +511,7 @@ save(file='local/processeddata.RData',list=c('eegdata','allfspec','channames'))
 
 load('local/processeddata.RData')
 
+colnames(eegdata) <- c('V1','V2','V3','V4')
 #drop rows with empty data (from removal of EEG data)
 eegdata <- eegdata[-c(21), ]
 
