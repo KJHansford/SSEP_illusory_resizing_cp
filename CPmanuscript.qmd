@@ -35,11 +35,10 @@ invisible(lapply(toinstall,library,character.only=TRUE))
 # if (!is_tinytex()){install_tinytex()}
 
 # create python environment and install packages
+  if (processdata==1){
   install_miniconda()
   use_miniconda('r-reticulate')
-  py_install(c('numpy'))
-  if (processdata==1){
-  py_install(c('mne', 'pandas', 'openpyxl'))
+  py_install(c('mne', 'numpy', 'pandas', 'openpyxl'))
   }
 
 # check for local files and directories and create/download if missing
@@ -97,28 +96,34 @@ if (!file.exists('local/demographics.csv')){
   osf_download(osffiles[fid,], path='local/',progress=TRUE)
 }
 
-if (!file.exists('local/Allfspec.npy')){
+# if (!file.exists('local/Allfspec.npy')){
+#   osfproject <- osf_retrieve_node("dr3ts")
+#   osffiles <- osf_ls_files(osfproject)
+#   fid <- which(osffiles$name=='Allfspec.npy')
+#   osf_download(osffiles[fid,], path='local/',progress=TRUE)
+# }
+# 
+# if (!file.exists('local/amplitudes.npy')){
+#   osfproject <- osf_retrieve_node("dr3ts")
+#   osffiles <- osf_ls_files(osfproject)
+#   fid <- which(osffiles$name=='amplitudes.npy')
+#   osf_download(osffiles[fid,], path='local/',progress=TRUE)
+# }
+# 
+# 
+# if (!file.exists('local/channames.npy')){
+#   osfproject <- osf_retrieve_node("dr3ts")
+#   osffiles <- osf_ls_files(osfproject)
+#   fid <- which(osffiles$name=='channames.npy')
+#   osf_download(osffiles[fid,], path='local/',progress=TRUE)
+# }
+
+if (!file.exists('local/processeddata.RData')){
   osfproject <- osf_retrieve_node("dr3ts")
   osffiles <- osf_ls_files(osfproject)
-  fid <- which(osffiles$name=='Allfspec.npy')
+  fid <- which(osffiles$name=='processeddata.RData')
   osf_download(osffiles[fid,], path='local/',progress=TRUE)
 }
-
-if (!file.exists('local/amplitudes.npy')){
-  osfproject <- osf_retrieve_node("dr3ts")
-  osffiles <- osf_ls_files(osfproject)
-  fid <- which(osffiles$name=='amplitudes.npy')
-  osf_download(osffiles[fid,], path='local/',progress=TRUE)
-}
-
-
-if (!file.exists('local/channames.npy')){
-  osfproject <- osf_retrieve_node("dr3ts")
-  osffiles <- osf_ls_files(osfproject)
-  fid <- which(osffiles$name=='channames.npy')
-  osf_download(osffiles[fid,], path='local/',progress=TRUE)
-}
-
 
 if (!file.exists('cp_references.bib')){
   osfproject <- osf_retrieve_node("sjvua")
@@ -481,15 +486,10 @@ if r.processdata==1:
                                   
 ```
 
-```{r SSEPanalysis, include=FALSE}
+```{r converttoR, include=FALSE}
 
-#EEG Analysis
-
-#install needed package
-#install_miniconda()
-# use_miniconda('r-reticulate')
-
-#import numpy
+if (processdata==1){
+  
 np <- import('numpy')
 
 #import data
@@ -497,8 +497,19 @@ eegdata <- np$load('local/amplitudes.npy')
 allfspec <- np$load('local/Allfspec.npy')
 channames <- np$load('local/channames.npy')
 
-#make eegdata dataframes
-eegdata <- data.frame(eegdata)
+#make eegdata dataframes - this seems to be not working in the github actions version
+eegdata <- as.data.frame(eegdata)
+
+save(file='local/processeddata.RData',list=c('eegdata','allfspec','channames'))
+}
+
+```
+
+```{r SSEPanalysis, include=FALSE}
+
+#EEG Analysis
+
+load('local/processeddata.RData')
 
 #drop rows with empty data (from removal of EEG data)
 eegdata <- eegdata[-c(21), ]
