@@ -498,7 +498,7 @@ allfspec <- np$load('local/Allfspec.npy')
 channames <- np$load('local/channames.npy')
 
 #make eegdata dataframes
-eegdata <- as.data.frame(eegdata)
+eegdata <- data.frame(eegdata)
 
 #drop rows with empty data (from removal of EEG data)
 eegdata <- eegdata[-c(21), ]
