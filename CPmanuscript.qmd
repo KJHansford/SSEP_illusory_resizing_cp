@@ -1,5 +1,5 @@
 ---
-title: "Somatosensory Response Changes During Illusory Finger Stretching in Participants with Chronic Hand-Based Pain"
+title: "Illusory Finger Stretching and Somatosensory Responses in Participants with Chronic Hand-Based Pain"
 author: ""
 bibliography: cp_references.bib
 csl: elife.csl
@@ -38,7 +38,8 @@ invisible(lapply(toinstall,library,character.only=TRUE))
   if (processdata==1){
   install_miniconda()
   use_miniconda('r-reticulate')
-  py_install(c('mne', 'numpy', 'pandas', 'openpyxl'))
+  # install_python(version="3.10")
+  py_install(c('mne', 'numpy', 'scikit-learn', 'matplotlib', 'pandas', 'openpyxl'))
   }
 
 # check for local files and directories and create/download if missing
@@ -60,7 +61,7 @@ if (processdata==1){
   for (subj in 1:21){
     if (!file.exists(paste0('local/EEG Data/CP',subj,'/CP',subj,'_block1_EEG.fdt'))){
     fid <- which(osffiles$name==paste0('CP',subj,'_block1_EEG.fdt'))
-    osf_download(osffiles[fid,], path=paste0('local/EEG Data/CP',subj),progress=TRUE,conflicts='overwrite')
+    osf_download(osffiles[fid,], path=paste0('local/EEG Data/CP',subj),progress=TRUE)
     }
     if (!file.exists(paste0('local/EEG Data/CP',subj,'/CP',subj,'_block1_EEG.set'))){
     fid <- which(osffiles$name==paste0('CP',subj,'_block1_EEG.set'))
@@ -72,13 +73,6 @@ if (!file.exists('local/subjective data.csv')){
   osfproject <- osf_retrieve_node("ry5fs")
   osffiles <- osf_ls_files(osfproject)
   fid <- which(osffiles$name=='subjective data.csv')
-  osf_download(osffiles[fid,], path='local/',progress=TRUE)
-}
-
-if (!file.exists('local/pain data.csv')){
-  osfproject <- osf_retrieve_node("ry5fs")
-  osffiles <- osf_ls_files(osfproject)
-  fid <- which(osffiles$name=='pain data.csv')
   osf_download(osffiles[fid,], path='local/',progress=TRUE)
 }
 
@@ -488,8 +482,14 @@ if r.processdata==1:
 
 ```{r converttoR, include=FALSE}
 
+#EEG Analysis
+
+#install needed package
+#install_miniconda()
+# use_miniconda('r-reticulate')
+
 if (processdata==1){
-  
+#import numpy
 np <- import('numpy')
 
 #import data
@@ -497,7 +497,7 @@ eegdata <- np$load('local/amplitudes.npy')
 allfspec <- np$load('local/Allfspec.npy')
 channames <- np$load('local/channames.npy')
 
-#make eegdata dataframes - this seems to be not working in the github actions version
+#make eegdata dataframes
 eegdata <- as.data.frame(eegdata)
 
 save(file='local/processeddata.RData',list=c('eegdata','allfspec','channames'))
@@ -533,6 +533,7 @@ pdf('Figures/eegdata.pdf', width = 12, height = 11)
   geom_violin(trim = FALSE) + 
   geom_violin(aes(color = Condition), trim = FALSE) + 
   geom_boxplot(width = 0.2, outlier.shape = NA, color = "black")+
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="black", fill="black") +
   geom_dotplot(binaxis = "y",
                stackdir = "center",
                dotsize = 0.5,
@@ -548,7 +549,7 @@ pdf('Figures/eegdata.pdf', width = 12, height = 11)
                                                                #c("UV.Illusion.Median","MS.Illusion.Median")),
               #map_signif_level = TRUE,annotations="***",y_position = c(115,135,145))+
   scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
-  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
 dev.off()
 
 #assumption check
@@ -567,7 +568,7 @@ eegdatamsds <- group_by(eegdata_2, Condition) %>%
   )
 
 #run one way RMANOVA for illusion data
-#res.aov4 <- anova_test(data = eegdata_2, dv = Amplitude, wid = PID, within = Condition)
+#res.aov4CP <- anova_test(data = eegdata_2, dv = Amplitude, wid = PID, within = Condition)
 #get_anova_table(res.aov4)
 
 #posthoc tests
@@ -584,7 +585,7 @@ effectsize_eeg1 <- eegdata_2 %>% friedman_effsize(Amplitude ~ Condition |PID)
 
 #posthoc tests
 nppwc_eeg1 <- eegdata_2 %>%
-  wilcox_test(Amplitude ~ Condition, paired = TRUE, comparisons = list(c("V1", "V3"), c("V1", "V4"), c("V1", "V2")), p.adjust.method = "holm")
+  wilcox_test(Amplitude ~ Condition, paired = TRUE, comparisons = list(c("V1", "V3"), c("V1", "V4"), c("V1", "V2")), p.adjust.method = "holm", detailed = TRUE)
 
 ```
 
@@ -850,11 +851,13 @@ pdf('Figures/illusiondata.pdf', width = 12, height = 12)
   geom_violin(trim = FALSE) + 
   geom_violin(aes(color = Condition), trim = FALSE) + 
   geom_boxplot(width = 0.2, outlier.shape = NA, color = "black")+
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="black", fill="black") +
   geom_dotplot(binaxis = "y",
                stackdir = "center",
                dotsize = 0.5,
                alpha = 0.2) +
   ylab("Illusion Score")+
+  scale_y_continuous(breaks=seq(-100,150,50)) +
   font("ylab", size = 20)+
   font("xlab", size = 20)+
   font("xy.text", size = 15)+
@@ -864,7 +867,7 @@ pdf('Figures/illusiondata.pdf', width = 12, height = 12)
                                                                c("UV.Illusion.Median","MS.Illusion.Median")),
               map_signif_level = TRUE,annotations="***",y_position = c(115,135,145))+
   scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
-  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
 dev.off()
 
 #assumption check
@@ -901,7 +904,7 @@ effectsize_illusion <- subjecitve_data_illusion_1 %>% friedman_effsize(Score ~ C
 
 #posthoc tests
 nppwc_illusion <- subjecitve_data_illusion_1 %>%
-  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm")
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm", detailed = TRUE)
 
 #disownership analysis
 
@@ -928,6 +931,7 @@ pdf('Figures/disownershipdata.pdf', width = 12, height = 11)
   geom_violin(trim = FALSE) + 
   geom_violin(aes(color = Condition), trim = FALSE) + 
   geom_boxplot(width = 0.2, outlier.shape = NA)+
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="black", fill="black") +
   geom_dotplot(binaxis = "y",
                stackdir = "center",
                dotsize = 0.5,
@@ -942,7 +946,7 @@ pdf('Figures/disownershipdata.pdf', width = 12, height = 11)
                                                                c("MS.Disownership.Median","UV.Disownership.Median")),
               map_signif_level = TRUE,annotations=c("*","*","*"),y_position = c(115,130,145))+
   scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
-  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
 dev.off()
 
 #assumption check
@@ -979,7 +983,7 @@ effectsize_disownership <- subjecitve_data_disownership_1 %>% friedman_effsize(S
 
 #posthoc tests
 nppwc_disownership <- subjecitve_data_disownership_1 %>%
-  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm")
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "holm", detailed = TRUE)
 
 
 
@@ -1008,6 +1012,7 @@ pdf('Figures/controldata.pdf', width = 12, height = 11)
   geom_violin(trim = FALSE) + 
   geom_violin(aes(color = Condition), trim = FALSE) + 
   geom_boxplot(width = 0.2, outlier.shape = NA)+
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="black", fill="black") +
   geom_dotplot(binaxis = "y",
                stackdir = "center",
                dotsize = 0.5,
@@ -1020,7 +1025,7 @@ pdf('Figures/controldata.pdf', width = 12, height = 11)
   geom_signif(data=subjecitve_data_control_1,comparisons=list(c("NI.Control.Median","UV.Control.Median")),
               map_signif_level = TRUE,annotations=c("*"),y_position = c(145))+
   scale_color_manual(values = c("darkorange3", "darkorange3","darkorange3", "darkorange3"))+
-  theme(legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  theme(axis.text.x = element_text(size = 20),axis.text.y = element_text(size = 20),legend.position = "none", panel.background = element_blank(),axis.line = element_line(colour = "black"))
 dev.off()
 
 #assumption check
@@ -1056,7 +1061,7 @@ effectsize_control <- subjecitve_data_control_1 %>% friedman_effsize(Score ~ Con
 
 #posthoc tests
 nppwc_control <- subjecitve_data_control_1 %>%
-  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "bonferroni")
+  wilcox_test(Score ~ Condition, paired = TRUE, p.adjust.method = "bonferroni", detailed = TRUE)
 
 
 
@@ -1076,7 +1081,7 @@ pdf('Figures/correlationdata.pdf', width = 12, height = 11)
           cor.coef = TRUE, cor.method = "spearman",
           cor.coef.size = 8,
           xlab = "Subjecitve Illusion Score", ylab = "SSEP Amplitude (µV)") +
-    theme(text = element_text(size = 20))
+    theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), text = element_text(size = 20))
           
 dev.off()
 
@@ -1125,19 +1130,19 @@ pain_data_UV1 <- pain_data_UV1 %>% pivot_longer(cols=c('UV.Pre', 'UV.Post'),
 
 #Paired Samples Wilcoxon Test
 paintestNI <- pain_data_NI1  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 paintestNIT <- pain_data_NIT1  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 paintestMS <- pain_data_MS1  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 paintestUV <- pain_data_UV1  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 #medians and sds for pain data
@@ -1191,10 +1196,12 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
 geom_signif(data=pain_data_NI1,comparisons=list(c("NI.Pre","NI.Post")),
               map_signif_level = TRUE,annotations="*",y_position = c(17))+
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for NIT data 
@@ -1208,8 +1215,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion Tactile')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for MS data
@@ -1223,8 +1232,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Multisensory')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 
@@ -1239,8 +1250,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Unimodal-Visual')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 grid.arrange(NIpain, NITpain, MSpain, UVpain, ncol=2, nrow =2)
@@ -1259,19 +1272,19 @@ primaryUV <- subset(pain_data_UV1, grepl('magenta3', pain.type))
 
 #exploratory secondary pain analysis
 secondarytestNI <- secondaryNI  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 secondarytestNIT <- secondaryNIT  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 secondarytestMS <- secondaryMS  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 secondarytestUV <- secondaryUV  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 #medians and sds for pain data
@@ -1317,8 +1330,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for NIT data 
@@ -1332,8 +1347,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion Tactile')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for MS data
@@ -1347,8 +1364,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Multisensory')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 
@@ -1363,8 +1382,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Unimodal-Visual')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 grid.arrange(NIpainc2, NITpainc2, MSpainc2, UVpainc2, ncol=2, nrow =2)
@@ -1373,19 +1394,19 @@ dev.off()
 
 #exploratory primary pain analysis
 primarytestNI <- primaryNI  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 primarytestNIT <- primaryNIT  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 primarytestMS <- primaryMS  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 primarytestUV <- primaryUV  %>%
-  wilcox_test(Score ~ Condition, paired = TRUE) %>%
+  wilcox_test(Score ~ Condition, paired = TRUE, detailed = TRUE) %>%
   add_significance()
 
 #medians and sds for pain data
@@ -1431,8 +1452,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for NIT data 
@@ -1446,8 +1469,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Non-Illusion Tactile')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 # create plot for MS data
@@ -1461,8 +1486,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Multisensory')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 
@@ -1477,8 +1504,10 @@ theme(axis.line.x = element_line(color="black", size = 0.5),
 guides(fill = FALSE) +
 ylab('Pain Score (0 - 20)')+
 xlab('Unimodal-Visual')+
+font("ylab", size = 20)+
+font("xlab", size = 20)+
 ylim(0,20) +
-theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
 panel.background = element_blank())
 
 grid.arrange(NIpainc1, NITpainc1, MSpainc1, UVpainc1, ncol=2, nrow =2)
@@ -1593,15 +1622,15 @@ NI_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NI)) +
   labs(x = "Non-Illusion",
        y = "Percentage Change (%)") +
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 3.4)
 
 NIT_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
@@ -1610,16 +1639,18 @@ NIT_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
   ylim(-150,300) +
   labs(x = "Non-Illusion Tactile",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 3.4)
 
 MS_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
@@ -1628,16 +1659,18 @@ MS_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
   ylim(-150,300) +
   labs(x = "Multisensory",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=16, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=16.5, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=16, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=16.5, y=-49, label="Extremely meaningful",size = 3.4)
 
 UV_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill="darkorange3",alpha = 0.5) +
@@ -1646,16 +1679,18 @@ UV_exp <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
   ylim(-150,300) +
   labs(x = "Unimodal-Visual",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=10, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=10.5, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=10, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=10.5, y=-49, label="Extremely meaningful",size = 3.4)
 
 grid.arrange(NI_exp, NIT_exp, MS_exp, UV_exp, ncol=2, nrow =2)
 dev.off()
@@ -1670,16 +1705,18 @@ NI_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NI)) +
   ylim(-150,300) +
   labs(x = "Non-Illusion",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=12, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=12, y=-49, label="Extremely meaningful",size = 3.4)
 
 NIT_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
@@ -1688,16 +1725,18 @@ NIT_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_NIT)) +
   ylim(-150,300) +
   labs(x = "Non-Illusion Tactile",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=4, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=4, y=-49, label="Extremely meaningful",size = 3.4)
 
 MS_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
@@ -1706,16 +1745,18 @@ MS_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_MS)) +
   ylim(-150,300) +
   labs(x = "Multisensory",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=16, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=16.5, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=16, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=16.5, y=-49, label="Extremely meaningful",size = 3.4)
 
 UV_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
   geom_bar(stat = "identity",position=position_dodge(),color="black",fill=PCplotdata$pain.type,alpha = 0.5) +
@@ -1724,16 +1765,18 @@ UV_expc <- ggplot(data = PCplotdata, aes(x = PID, y = percentage_change_UV)) +
   ylim(-150,300) +
   labs(x = "Unimodal-Visual",
        y = "Percentage Change (%)") +
+  font("ylab", size = 20)+
+  font("xlab", size = 20)+
   theme_minimal() +
-  theme(axis.line.x = element_line(color="black", size = 0.5),
+  theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20),axis.line.x = element_line(color="black", size = 0.5),
       axis.line.y = element_line(color="black", size = 0,5)) +
   theme(axis.text.x = element_blank()) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
   panel.background = element_blank()) +
   geom_hline(yintercept=-30, linetype="dashed", color = "black",alpha = 0.3) +
-  annotate("text", x=10, y=-29, label="Clinically meaningful", size = 2.75) +
+  annotate("text", x=10.5, y=-29, label="Clinically meaningful", size = 3.4) +
   geom_hline(yintercept=-50, linetype="dashed", color = "black", alpha = 0.3) +
-  annotate("text", x=10, y=-49, label="Extremely meaningful",size = 2.75)
+  annotate("text", x=10.5, y=-49, label="Extremely meaningful",size = 3.4)
 
 grid.arrange(NI_expc, NIT_expc, MS_expc, UV_expc, ncol=2, nrow =2)
 dev.off()
@@ -1761,7 +1804,7 @@ pdf('Figures/correlationdata2.pdf', width = 12, height = 11)
           cor.coef = TRUE, cor.method = "spearman",
           cor.coef.size = 8,
           xlab = "Pain Percentage Change", ylab = "SSEP Amplitude (µV)") +
-    theme(text = element_text(size = 20))
+    theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),text = element_text(size = 20))
           
 dev.off()
 
@@ -1778,7 +1821,7 @@ pdf('Figures/correlationdata3.pdf', width = 12, height = 11)
           cor.coef = TRUE, cor.method = "spearman",
           cor.coef.size = 8,
           xlab = "Subjecitve Illusion Score", ylab = "Pain Percentage Change") +
-    theme(text = element_text(size = 20))
+    theme(axis.text.x = element_text(size = 20), axis.text.y = element_text(size = 20),text = element_text(size = 20))
           
 dev.off()
 
@@ -1786,27 +1829,27 @@ dev.off()
 
 # Abstract
 
-Current pharmaceutical interventions for chronic pain are reported to be minimally effective, leading researchers to investigate non-pharmaceutical avenues for chronic pain treatment. One such avenue is resizing illusions delivered using augmented reality. These illusions resize the affected body part through stretching or shrinking manipulations and have been shown to give analgesic effects; however, the neural underpinnings of these illusions remain undefined. Steady-state evoked potentials (SSEPs) have been studied within populations without chronic pain undergoing hand-based resizing illusions, finding slight decreases in SSEP amplitudes during illusory stretching. Here, we present comparable findings from a sample with chronic pain also showing slight decreases in SSEP amplitude during illusory stretching. However, no significant differences in pain ratings were found following illusory resizing, likely due to the experimental set up itself causing a significant increase in pain. Despite a lack of illusory analgesia across the sample, several participants experienced clinically meaningful levels of pain reduction following illusory resizing, meaning that the associated reduction in SSEP amplitude could reflect neural mechanisms involved in experiences of illusory analgesia.
+Current pharmaceutical interventions for chronic pain are reported to be minimally effective, leading researchers to investigate non-pharmaceutical avenues for chronic pain treatment. One such avenue is resizing illusions delivered using augmented reality. These illusions resize the affected body part through stretching or shrinking manipulations and have been shown to give analgesic effects; however, the neural underpinnings of these illusions remain undefined. Steady-state evoked potentials (SSEPs) have been studied within populations without chronic pain undergoing hand-based resizing illusions, finding no convincing differences in SSEP amplitudes during illusory stretching. Here, we present comparable findings from a sample with chronic pain, who are thought to have blurred cortical representations of painful body parts, but again find no clear differences in SSEP amplitude during illusory stretching. However, no significant decreases in pain ratings were found following illusory resizing, and changes in SSEP amplitudes are thought to possibly reflect experiences of illusory analgesia. Despite a lack of illusory analgesia across the sample, several participants experienced clinically meaningful levels of pain reduction following illusory resizing, highlighting the potential of resizing illusions as an analgesia treatment avenue. 
 
 # Introduction
 
 Chronic pain is classified as pain that lasts or reoccurs for more than 3 months [@merskey1986a; @nice2021a], and is the leading cause of disability globally [@vos2017a]. Current pharmaceutical interventions for chronic pain conditions are minimally effective, with treatments having ill-defined long-term effects [@altman2000a], and often being no more effective than placebo at reducing pain or improving functionality [@meenagh2004a; @heyworth2008a]. Many drugs prescribed for pain result in around 60% of patients reporting no pain improvement or adverse effects [@dworkin2010a; @corriger2022a]. Surgical interventions to reduce chronic pain can result in up to 34% of patients reporting unfavourable pain outcomes [@beswick2012a]. Due to current treatments being largely ineffective, there is a clear need to find a non-pharmaceutical and non-surgical option for chronic pain treatment. 
 
-Individuals who live with chronic pain could have a cortical misrepresentation of their body and its incoming somatosensory signals, including pain, along with perceptual size dysfunctions of their affected limbs, which underpin their persistent pain [@boesch2016a]. There is often reported a lack of concordance between radiographic (physical damage) and symptomatic pain [@szebenyi2006a; @felson2005a]. This highlights the likelihood of a cortical misrepresentation driving pain rather than structural damage, explaining why surgical interventions to treat structural elements of chronic pain could be ineffective. Theories underlying cortical misrepresentations are the predictive coding account [@friston2008a] and the central sensitisation theory @arendt-nielsen2003a; @arendt-nielsen2010a]. Predictive coding posits that any mismatch between predicted and actual sensory inputs, such as the difference between peripheral signals and symptomatic pain, generates prediction errors. A lack of updating of top-down expectations in individuals with chronic pain, could lead to constant mismatches between symptomatic and radiographic sensory inputs. Central sensitisation theory, however, refers to the central nervous system changing, distorting, or amplifying pain in a way that no longer reflects the peripheral input from the body, leading to pain becoming an illusory perception [@woolf2011a]. Central sensitisation and predictive coding theories are not positioned in opposition to each other, but rather both contribute to the overall understanding of potential causes of chronic pain conditions. Both theories support the suitability of illusion therapies for the amelioration of chronic pain, as bodily illusions can induce perceptual modulations of the painful body part, altering the patient’s perception of their body and the pain related to it.  
+Individuals who live with chronic pain could have a cortical misrepresentation of their body and its incoming somatosensory signals, including pain, along with perceptual size distortions of their affected limbs, which underpin their persistent pain [@boesch2016a]. There is often reported a lack of concordance between radiographic (physical damage) and symptomatic pain [@szebenyi2006a; @felson2005a]. This highlights the likelihood of a cortical misrepresentation driving pain rather than structural damage, explaining why surgical interventions to treat structural elements of chronic pain could be ineffective. Theories underlying cortical misrepresentations include the predictive coding account [@friston2008a] and the central sensitisation theory @arendt-nielsen2003a; @arendt-nielsen2010a]. Predictive coding posits that any mismatch between predicted and actual sensory inputs, such as the difference between peripheral signals and symptomatic pain, generates prediction errors. A lack of updating of top-down expectations in individuals with chronic pain, could lead to constant mismatches between symptomatic and radiographic sensory inputs. Central sensitisation theory, however, refers to the central nervous system changing, distorting, or amplifying pain in a way that no longer reflects the peripheral input from the body, leading to pain becoming an illusory perception [@woolf2011a]. Central sensitisation and predictive coding theories are not in opposition to each other, but rather both contribute to the overall understanding of potential causes of chronic pain conditions. Both theories support the suitability of illusion therapies for the amelioration of chronic pain, as bodily illusions can induce perceptual modulations of the painful body part, altering the patient’s perception of their body and the pain related to it.  
 
-Illusory resizing is a bodily illusion which changes the way a body part is perceived, exploiting principles of multisensory integration to elicit modulations in the perceived size and shape of the body part [@preston2011a; @preston2020a; @stanton2018a]. Multisensory resizing illusions typically involve both tactile and visual inputs and can be delivered via an augmented reality system. Augmented reality can present real-time video capture of a hand, from the same position and perspective as if the hand were being viewed directly [@preston2011a], allowing the experimenter to deliver tactile manipulations, such as gently pulling the hand / fingers, whilst the participant views their hand / fingers stretching in the augmented image. @newport2010a found strong embodiment using multisensory visuotactile illusions, and our recent work [@hansford2023a] found that multisensory illusions elicited significantly greater illusory experience compared to non-illusion conditions. Regarding unimodal visual illusions, which consist of visual input of the finger stretching but without any tactile input, mixed results have been found with inconsistencies reported in illusory experience. Some participants show quite high illusory experiences during unimodal visual presentations, whilst others report no experience of illusory stretching [@hansford2023a; @hansford2024c]. Previous research has found a reduction in hand and knee pain in osteoarthritis (OA) patients using augmented reality to deliver multisensory resizing illusions [@preston2011a; @preston2020a; @stanton2018a], therefore both multisensory and unimodal visual resizing illusions are delivered in the present study to assess if illusory experience is required for illusory analgesia. 
+Illusory resizing is a bodily illusion which changes the way a body part is perceived, exploiting principles of multisensory integration to elicit modulations in the perceived size and shape of the body part [@preston2011a; @preston2020a; @stanton2018a]. Multisensory resizing illusions typically involve both tactile and visual inputs and can be delivered via an augmented reality system. Augmented reality can present real-time video capture of a hand, from the same position and perspective as if the hand were being viewed directly [@preston2011a], allowing the experimenter to deliver tactile manipulations, such as gently pulling the hand / fingers, whilst the participant views their hand / fingers stretching in the augmented image. @newport2010a found strong embodiment using multisensory visuotactile illusions, and our recent work [@hansford2023a] found that multisensory illusions elicited significantly greater illusory experience compared to non-illusion conditions. Regarding unimodal visual illusions, which consist of visual input of the finger stretching but without any tactile input, mixed results have been found with inconsistencies reported in illusory experience. Some participants show quite strong illusory experiences during unimodal visual presentations, whilst others report no experience of illusory stretching [@hansford2023a; @hansford2024c]. Previous research has found a reduction in hand and knee pain in osteoarthritis (OA) patients using augmented reality to deliver multisensory resizing illusions [@preston2011a; @preston2020a; @stanton2018a], therefore both multisensory and unimodal visual resizing illusions are delivered in the present study to assess if illusory experience is required for illusory analgesia. 
 
-There are two main theories underlying analgesic resizing illusions. Firstly, the somatosensory blurring hypothesis posits that the cortical representation of a painful body part is blurred, and viewing the body part sharpens this representation. This is supported through findings from participants without chronic pain, where visual analgesia has been found following experimentally induced pain [@haggard2013a]. The second theory stems from research by @gilpin2015a, finding that participants with arthritis make smaller hand judgements compared to those without the condition, suggesting a reduced cortical representation of their hands. Pain reductions have been found for participants with arthritis when using stretching resizing illusions [@preston2011a], therefore, @gilpin2015a posit that increasing cortical representation of the hands through magnifying (stretching) could reduce pain. Both theories predict that cortical misrepresentations occur at the somatosensory cortex, with both theories predicting different neural changes regarding the experience of pain. Specifically, the somatosensory blurring hypothesis predicts a larger, more diffuse representation of the painful body part that would be reduced (sharpened) during resizing illusions, whereas the magnification theory predicts a shrunken representation of the painful body part that would be enlarged following illusory stretching.
+There are two main theories underlying analgesic resizing illusions. Firstly, the somatosensory blurring hypothesis posits that the cortical representation of a painful body part is blurred, and viewing the body part sharpens this representation. This is supported through findings from participants without chronic pain, where visual analgesia has been found following experimentally induced pain [@haggard2013a]. The second theory stems from research by @gilpin2015a, finding that participants with arthritis judge their affected hands to be smaller compared to individuals without the condition, suggesting a reduced cortical representation of their hands. Pain reductions have been found for participants with arthritis when using stretching resizing illusions [@preston2011a], therefore, @gilpin2015a posit that increasing cortical representation of the hands through magnifying (stretching) could reduce pain. Both theories predict that cortical misrepresentations occur in the somatosensory cortex, with both theories predicting different neural changes regarding the experience of pain. Specifically, the somatosensory blurring hypothesis predicts a larger, more diffuse representation of the painful body part that would be reduced (sharpened) during resizing illusions, whereas the magnification theory predicts a shrunken representation of the painful body part that would be enlarged following illusory stretching.
 
-Somatosensory cortex modulation has been investigated using steady-state evoked potentials (SSEPs), where low-level somatosensory responses can be induced directly using vibrations of a known frequency applied to a body part. These generate a frequency-locked steady-state evoked potential detectable at the scalp using EEG [@snyder1992a; @tobimatsu1999a], and are an index of the cortical response to a stimulus, therefore can give an index of cortical response changes during illusory resizing. Our previous work [@hansford2024c] has found steady-state response decreases when participants without chronic pain undergo resizing illusions, however effects were too small to detect beyond omnibus statistics. Since people with chronic pain are thought to have cortical misrepresentations of their affected body parts, it is plausible that using the same paradigm as in our previous work, we might see greater differences in somatosensory response to illusory stretching in a population with chronic hand-based pain. SSEP responses can therefore be used to directly compare the somatosensory blurring hypothesis [@haggard2013a] and the magnifying hypothesis [@gilpin2015a], as an increased SSEP response following illusory resizing could indicate support for the magnification hypothesis, suggesting increased cortical representation of the painful body part, whereas a smaller SSEP response after illusory resizing could support the somatosensory blurring hypothesis, suggesting the cortical representation of the body part has become sharpened. 
+Somatosensory cortex modulation has been investigated using steady-state evoked potentials (SSEPs), where low-level somatosensory responses can be induced directly using vibrations of a known frequency applied to a body part. These generate a frequency-locked steady-state evoked potential detectable at the scalp using EEG [@snyder1992a; @tobimatsu1999a], and are an index of the cortical response to a stimulus, therefore can potentially give an index of cortical response changes during illusory resizing. Our previous work [@hansford2024c] despite finding slight steady-state response decreases when participants without chronic pain underwent resizing illusions, gave no convincing evidence of somatosensory sharpening in participants without chronic pain. Since people with chronic pain are thought to have cortical misrepresentations of their affected body parts, it is plausible that using the same paradigm as in our previous work, we might see greater differences in somatosensory response to illusory stretching in a population with chronic hand-based pain. SSEP responses can therefore be used to directly compare the somatosensory blurring hypothesis [@haggard2013a] and the magnifying hypothesis [@gilpin2015a], as an increased SSEP response following illusory resizing could indicate support for the magnification hypothesis, suggesting increased cortical representation of the painful body part, whereas a smaller SSEP response after illusory resizing could support the somatosensory blurring hypothesis, suggesting the cortical representation of the body part has become sharpened. 
 
-Using different sensory manipulations of finger resizing illusions, in addition to using an electromagnetic solenoid stimulator to elicit SSEPs, this study aimed to investigate subjective illusory experience and neural responses to resizing illusions in participants with chronic hand-based pain. To test this, different resizing illusions consisting of multisensory (visuotactile) stretching (MS), unimodal-visual stretching (UV), a non-illusion control condition without tactile input (NI), and a non-illusion control condition with tactile input (NIT) were used. Previous research has suggested that tactile input alone can reduce pain ratings [@mancini2014a; @nahra2003a], therefore this second control condition was used to demonstrate if the illusion itself delivered analgesia rather than the tactile or combined sensory inputs. The first hypothesis, acting as a positive control (1), was that there would be a greater illusory experience, measured via a subjective illusory experience questionnaire, in the MS condition compared to the NI and NIT conditions. The main experimental hypothesis was that (2) there would be a significant difference in SSEP response when comparing (2a) MS illusory resizing to the NI condition, when comparing (2b) UV illusory resizing to the NI condition, but no difference when comparing (2c) the NIT condition to the NI condition. The final hypothesis was that (3) there would be a reduction in pain, measured via a 21-point numeric rating scale, comparing before and after scores for (3a) MS and (3b) UV conditions, whilst we expected (3c) no reduction of pain following the NI condition, nor (3d) a reduction of pain following the NIT condition.
+Using different sensory manipulations of finger resizing illusions, in addition to using an electromagnetic solenoid stimulator to elicit SSEPs, this study aimed to investigate subjective illusory experience and neural responses to resizing illusions in participants with chronic hand-based pain. To test this, different resizing illusions consisting of multisensory (visuotactile) stretching (MS), unimodal-visual stretching (UV), a non-illusion control condition without tactile input (NI), and a non-illusion control condition with tactile input (NIT) were used. Previous research has suggested that tactile input alone can reduce pain ratings [@mancini2014a; @nahra2003a], therefore this second control condition was used to test if the illusion itself delivered analgesia rather than the tactile or combined sensory inputs. The first hypothesis, acting as a positive control (1), was that there would be a greater illusory experience, measured via a subjective illusory experience questionnaire, in the MS condition compared to the NI and NIT conditions. The main experimental hypothesis was that (2) there would be a significant difference in SSEP response when comparing (2a) MS illusory resizing to the NI condition, when comparing (2b) UV illusory resizing to the NI condition, but no difference when comparing (2c) the NIT condition to the NI condition. The final hypothesis was that (3) there would be a reduction in pain, measured via a 21-point numeric rating scale, comparing before and after scores for (3a) MS and (3b) UV conditions, whilst we expected (3c) no reduction of pain following the NI condition, nor (3d) a reduction of pain following the NIT condition.
 
 # Methods
 
 ## Sample Size
 
-Based on power analyses in section 2.5, a sample size of 30 participants was aimed for to adhere to the higher end of sample size estimates (Hypothesis 2 (2.5.2)). However, due to scarcity of participants experiencing pain in either their right index or middle fingers (digits needed for the delivery of vibrotactile and illusory manipulations, see section 2.2 Sample inclusion / exclusion criteria), a final sample size of 21 participants were tested after an 8-month recruitment period.
+Based on power analyses in section 2.5, a sample size of 30 participants was aimed for to adhere to the higher end of sample size estimates (Hypothesis 2 (2.5.2)). However, due to scarcity of participants experiencing pain in either their right index or middle fingers (digits needed for the delivery of vibrotactile and illusory manipulations, see section 2.2 Sample inclusion / exclusion criteria), a final sample size of 21 participants (mean age = 48.8 years; age range = 19 – 73 years; sex = 22.7% male, 77.3% female; ethnicity = 95% white; chronic pain = 5 primary pain, 10 secondary pain, 2 mixed, 4 no diagnosis) were tested during an 8-month recruitment period.
 
 ## Participants
 
@@ -1821,12 +1864,12 @@ Inclusion and exclusion criteria were determined using self-report responses rel
 
 Raw data exclusion criteria:
 
--	Less than 100% of the experiment completed by a participant, more than 50% of electrodes for a single participant requiring removal from EEG data, or if both electrodes F1 and FC1 (electrodes of interest) require removal. More information about data removal can be found in section 2.4.1 Preprocessing Steps. 
+-	Less than 100% of the experiment completed by a participant, more than 50% of electrodes for a single participant requiring removal from EEG data, or if eihther electrodes F1 or FC1 (electrodes of interest) require removal. More information about data removal can be found in section 2.4.1 Preprocessing Steps. 
 
 
 ## Experimental Procedure
 
-All participants filled out a demographic survey, asking their age, sex, ethnicity, and any chronic pain condition diagnosis, and were asked to complete the revised Waterloo Handedness Questionnaire (WHQr) [@elias1998a]. The WHQr self-reported handedness questionnaire consisted of 36 questions. The questions were answered on a 5-level Likert scale to determine the degree of preferred hand use, with left always being -2, left usually being -1, equal use being 0, right usually being +1 and right always being +2. The sum of the total WHQr score was then used to categorise a respondent as left-handed (score of -24 or less), mixed handed (score of -23 to +23), or right-handed (score of +24 or higher). Only participants who were categorised as right-handed continued participation, with the exception of one participant who scored a result of mixed handed due to changes in hand use as a result of pain. Participants were asked their pain score on the day of testing for their digit in the most pain using a 21-point numeric rating scale (NRS) (0 = no pain at all; 20 = most severe pain imaginable). This 21-point scale has equivalent reliability to a more frequently used 11-point scale [@jensen2011a] and was chosen to aid comparability with previous studies which have used the 21-point NRS [@preston2011a; @preston2020a]. Additionally, since the scale is different to a typical rating scale of 1-10, participants would be more likely to think about the answer they give, rather than giving a number they always use when asked to rate their pain on a scale of 1-10. Participants were only tested if their pain on the day was above 0 on the 21-point scale. 
+All participants filled out a demographic survey, asking their age, sex, ethnicity, and any chronic pain condition diagnosis, and were asked to complete the revised Waterloo Handedness Questionnaire (WHQr) [@elias1998a]. The WHQr self-reported handedness questionnaire consisted of 36 questions. The questions were answered on a 5-level Likert scale to determine the degree of preferred hand use, with left always being -2, left usually being -1, equal use being 0, right usually being +1 and right always being +2. The sum of the total WHQr score was then used to categorise a respondent as left-handed (score of -24 or less), mixed handed (score of -23 to +23), or right-handed (score of +24 or higher). Only participants who were categorised as right-handed continued participation, with the exception of one participant who scored a result of mixed handed due to changes in hand use as a result of pain. Participants were asked their pain score on the day of testing for their digit in the most pain using a 21-point numeric rating scale (NRS) (0 = no pain at all; 20 = most severe pain imaginable). This 21-point scale has equivalent reliability to a more frequently used 11-point scale [@jensen2011a] and was chosen to aid comparability with previous studies which have used the 21-point NRS [@preston2011a; @preston2020a]. Additionally, since the scale is different to a typical rating scale of 1-10 (which is commonplace in clinical settings), participants would be more likely to think about the answer they give, rather than giving a number they always use when asked to rate their pain on a scale of 1-10. Participants were only tested if their pain on the day was above 0 on the 21-point scale. 
 
 Participants were then set up with an appropriately sized 64-channel EEG cap with electrodes arranged according to the 10/20 system. The experimenter used conductive gel to make a conductive bridge between the electrodes and the scalp to attempt to obtain impedance levels of <10kΩ per electrode. Data were collected using an ANT Neuroscan system, sampling at 1kHz. The whole head average was used as a reference.
 
@@ -1834,34 +1877,34 @@ Participants were then set up with an appropriately sized 64-channel EEG cap wit
 
 ![](Figures/Augmented Reality System.png)
 
+
 Schematic of Augmented Reality System with Tactile Stimulator.
 :::
 
 
-Participants were then seated behind the augmented reality system (Figure 1) and instructed to place their hand onto the black felt fabric within the augmented reality system. Within the self-built system there was a 1920 x 1080-pixel Spedal Webcam Wide Angle Camera at the edge of the black felt on the side the participant sits, away from the participant’s view. 26cms above the felt base, there was a mirror, which was placed 26cms below a screen with a resolution of 1920 x 1200 pixels, with a width of 52cms and a height of 32cms. The thickness of section on which the mirror sat was 2cms. This screen was 54cms from the base of the system, and the base of the system was 82cms from the ground. Participants were instructed to place either their right index or middle finger outstretched onto the felt. The decision of whether the participant used their index or middle finger was pseudo randomised (to give equal representation of each finger) via MATLAB prior to any participants taking part. There were two white dots for each hand on the felt and participants were instructed to place their hand between these two dots. Participants were instructed to view their hand’s image in the mirror (whilst the real hand was hidden from view) throughout the experiment. The camera placed underneath the mirror on the felt base was used to deliver a live feed video of the participant’s hands to the computer screen at the top of the augmented reality system, which showed in the mirror reflection to the participants. There was a delay of 170ms in the video processing pipeline from the camera image to the augmented video image.
+Participants were then seated behind the augmented reality system (Figure 1) and instructed to place their hand onto the black felt fabric. Within the self-built system there was a 1920 x 1080-pixel Spedal Webcam Wide Angle Camera at the edge of the black felt on the side the participant sits, away from the participant’s view. 26cm above the felt base, there was a mirror, which was placed 26cm below a screen with a resolution of 1920 x 1200 pixels, with a width of 52cm and a height of 32cm. The thickness of section on which the mirror sat was 2cm. This screen was 54cm from the base of the system, and the base of the system was 82cm from the ground. Participants were asked which digit (middle or index finger) was in the most pain and were asked to place this digit outstretched onto the felt. If both digits were equally painful, the digit that the participant chose as their preference was used. There were two white dots for each hand on the felt and participants were instructed to place their hand between these two dots. Participants were instructed to view their hand’s image in the mirror (whilst the real hand was hidden from view) throughout the experiment. The camera placed underneath the mirror on the felt base was used to deliver a live feed video of the participant’s hands to the computer screen at the top of the augmented reality system, which showed in the mirror reflection to the participants. There was a delay of 170ms in the video processing pipeline from the camera image to the augmented video image.
 
 Participants underwent 4 conditions: multisensory stretching (MS), unimodal-visual stretching (UV), a non-illusion control condition without tactile input (NI), and a non-illusion control condition with tactile input (NIT). There was vibrotactile stimulation to the finger in all conditions, but only tactile input of the researcher touching the participants finger in the MS and NIT conditions. Each trial lasted 2.4 seconds for the manipulation phase, where the finger was stretched by 60 pixels (2.1 centimetres) in UV and MS conditions, followed by a further 2.4 second habituation phase in which participants could view and move their (augmented) finger, whilst they keep the rest of their hand still, before the screen went dark, indicating that the next trial could start. The MS condition consisted of the researcher touching and pulling the participant’s finger as the participant viewed their finger stretching in a congruent manner. The UV condition consisted of the participants viewing their finger stretch without any experimenter manipulation. The NI condition provided no visual or touching tactile manipulations to the finger, the image of their finger was visible and unchanged throughout. The NIT control condition involved no visual input of the finger stretching, again the image of their finger was visible but unchanged. Additionally, this condition included tactile input of the experimenter’s hand touching the participant’s finger, but without pulling. Visualisation of all conditions can be seen in Figure 2.
 
 ::: {#fig-cond}
 
 ![](Figures/Conditions.png)
-
 Infographic of Experimental Conditions. MS = Multisensory Stretching, UV = Unimodal Visual Stretching, NIT = Non-Illusion Tactile, NI = Non-Illusion. During the manipulation phase (2.4 seconds) the visual image of the finger is stretched in the MS and UV conditions, and/or the experimenter provides tactile input (touch) in the MS and NIT conditions. The tactile input in the MS condition is accompanied by pulling.  During the habituation phase (2.4 seconds) participants are free to move their finger. The arrow denotes the direction of the experimenter’s action. The vibrotactile stimulator is depicted on the finger in each phase of the experiment as vibrations are presented throughout.
 :::
 
-The experimenter was seated opposite the participant, the other side of the augmented reality machine and touched the digit during MS and NIT conditions by holding onto the distal interphalangeal joint and gently touching (NIT) or pulling (MS) the finger whilst the participant kept their hand in place. Conditions were delivered across 4 blocks, with each block consisting of 24 trials of the same experimental condition, totalling 96 trials over all 4 blocks. The ordering of the blocks was randomised for each participant to prevent ordering effects. The experiment was programmed in, and the conditions randomised using MATLAB R2017a and the experimenter was informed of whether to pull the finger or to touch the finger via an indicative box displayed on the screen out of the participant’s view. If the box was blue, this indicated a need to pull the finger, if it was white it indicated a need to touch the finger, if there was no box displayed then this indicated no tactile manipulation from the experimenter. The researcher used a button press to trigger the start of the manipulation, and started pulling the finger, when needed, synchronously within the 2.4 second manipulation phase. If the experimenter were to forget to pull the finger on a multisensory condition, or mistakenly pulled the finger in a control trial, then this would noted during the experiment, and that trial would be removed from analysis. Fortunately, no trials needed removal due to experimenter error. Vibrations were delivered to the participant’s finger in all conditions using a miniature electromagnetic solenoid stimulator (Dancer Design Tactor; diameter 1.8mm) emitting vibrations produced by sending amplified 26Hz sine wave sound files, with stimulus intensity controlled by an amplifier (Dancer Design TactAmp). The tactor was driven at 50% of the maximum (i.e. a peak input voltage of 3V) using a 26Hz sine-wave, and delivered a peak force of 0.18N. The electromagnetic solenoid stimulator was attached to the participant’s finger that was outstretched to receive the manipulations, between the knuckle and the first finger joint, using clear medical tape and gave continuous stimulation for the duration of each trial. Participants were asked before each condition block and then again immediately after each condition block to rate their pain on the 21-point NRS, which was a verbal report that the experimenter inputted onto a Samsung Galaxy A6 Tablet, resulting in 4 pre and 4 post block pain reports per participant. Participants were encouraged to take a break between each of the blocks to stretch their hand. EEG was recorded throughout as a continuous recording with trials and conditions denoted by numbered 8-bit digital at the start of each trial (USB-TTL Module, Black Box Toolkit Ltd.). 
+The experimenter was seated opposite the participant, to the other side of the augmented reality machine and touched the digit during MS and NIT conditions by holding onto the distal interphalangeal joint and gently touching (NIT) or pulling (MS) the finger whilst the participant kept their hand in place. Conditions were delivered across 4 blocks, with each block consisting of 24 trials of the same experimental condition, totalling 96 trials over all 4 blocks. The ordering of the blocks was randomised for each participant to prevent ordering effects. The experiment was programmed in, and the conditions randomised using MATLAB R2017a and the Psychtoolbox library (Kleiner et al., 2007; Pelli, 1997: Brainard, 1997). The experimenter was informed of whether to pull the finger or to touch the finger via an indicative box displayed on the screen out of the participant’s view. If the box was blue, this indicated a need to pull the finger, if it was white it indicated a need to touch the finger, if there was no box displayed then this indicated no tactile manipulation from the experimenter. The researcher used a button press to indicate the start of the manipulation, and began pulling the finger, when needed, synchronously within the 2.4 second manipulation phase. If the experimenter were to forget to pull the finger on a multisensory condition, or mistakenly pulled the finger in a control trial, then this would noted during the experiment, and that trial would be removed from analysis. Fortunately, no trials needed removal due to experimenter error. Vibrations were delivered to the participant’s finger in all conditions using a miniature electromagnetic solenoid stimulator (Dancer Design Tactor; diameter 1.8mm) emitting vibrations produced by sending amplified 26Hz sine wave sound files, with stimulus intensity controlled by an amplifier (Dancer Design TactAmp). The tactor was driven at 50% of the maximum (i.e. a peak input voltage of 3V) using a 26Hz sine-wave, and delivered a peak force of 0.18N. The electromagnetic solenoid stimulator was attached to the participant’s finger that was outstretched to receive the manipulations, between the knuckle and the first finger joint, using clear medical tape and gave continuous stimulation for the duration of each trial. Participants were asked before each condition block and then again immediately after each condition block to rate their pain on the 21-point NRS, which was a verbal report that the experimenter entered on a Samsung Galaxy A6 Tablet, resulting in 4 pre and 4 post block pain reports per participant. Participants were encouraged to take a break between each of the blocks to stretch their hand. EEG was recorded throughout as a continuous recording with trial onsets and conditions indicated by numbered 8-bit digital at the start of each trial (USB-TTL Module, Black Box Toolkit Ltd.). 
 
 Finally, at the end of each block, the participant was asked to complete a subjective illusory experience questionnaire regarding a condition presented in a given block using a Samsung Galaxy Tab A6 tablet via a questionnaire on Qualtrics (Qualtrics, Provo, UT). The questionnaire consisted of six questions relating to the trials the participant had just experienced. Two statements related to illusory experience: “It felt like my finger was really stretching” / “It felt like the finger I saw was part of my body”, two related to disownership: “It felt like the finger I saw no longer belonged to me” / “It felt like the finger I saw was no longer part of my body”, and two were control questions: “It felt as if my finger had disappeared” / “It felt as if I might have had an extra finger” (all questions were directed towards the participants manipulated finger). Control questions were included to create an index for the illusion and disownership questions (more detail can be found in section 2.4.1 - Preprocessing steps), whilst disownership questions were included to assess if the potential experience from the illusions resulted from a disownership of the body part, or from subjective embodiment of the body part [@mccabe2011a]. A visual analogue scale from 0 – 100 was used for each statement, with 0 being strongly disagree, 50 being neutral and 100 being strongly agree. 
 
-Data collection was terminated after 8 months of recruitment. If a participant needed over 50% of the electrodes removed during preprocessing, or if either electrode F1 or FC1 needed removal, then their data was not included for SSEP analysis, which was the case for one participant. Due to difficulties recruiting participants with hand-based pain affecting the right index and/or middle digits, no additional participants were recruited to replace lost data.
+Data collection was terminated after 8 months of recruitment. If a participant needed over 50% of the electrodes removed during preprocessing, or if either electrode F1 or FC1 needed removal, then their data were not included for SSEP analysis, which was the case for one participant. Due to difficulties recruiting participants with hand-based pain affecting the right index and/or middle digits, no additional participants were recruited to replace lost data.
 
 ## Analysis Pipeline
 
 ### Preprocessing Steps
 
-EEG data were first converted using MATLAB and EEGlab from the ANT EEprobe .cnt format to EEGlab .set format. All subsequent analysis was then conducted using the MNE-Python toolbox [@gramfort2013a]. A 50Hz notch filter was first applied to the raw EEG data for all electrodes, followed by calculation of the standard error across time for each electrode for each participant [@luck2021a]. Across the standard errors for all participants, the 5% of electrodes which showed the largest standard errors were used to create a standard error threshold. Any electrode with a standard error above this threshold, or with a value of 0, was removed from analysis. Where a participant had over 50% of their electrodes over the standard error threshold or with a value of 0, or if the electrodes requiring removal included either electrodes F1 or FC1 (electrodes of interest), then their data was removed. Primary analysis of the remaining EEG data then involved averaging the signal across the electrodes of interest (or using just electrode F1 or FC1 in case of electrode removal), and calculating the Fourier transform for each trial per participant. These amplitudes were then averaged across trials to give overall results for each participant. Statistical comparisons were then performed on the Fourier amplitudes at the stimulation frequency (26Hz), across conditions and participants. No additional filtering or denoising steps were applied to the EEG data, in line with @figueira2022a report that only a Fourier transform is typically needed for this type of EEG data.
+EEG data were first converted using MATLAB and EEGlab (Delorme & Makeig, 2004) from the ANT EEprobe .cnt format to EEGlab .set format. All subsequent analysis was then conducted using the MNE-Python toolbox [@gramfort2013a]. A 50Hz notch filter was first applied to the raw EEG data for all electrodes, followed by calculation of the standard error across time for each electrode for each participant [@luck2021a]. Across the standard errors for all participants, the 5% of electrodes which showed the largest standard errors were used to create a standard error threshold. Any electrode with a standard error above this threshold, or with a value of 0, was removed from analysis. Where a participant had over 50% of their electrodes over the standard error threshold or with a value of 0, or if the electrodes requiring removal included either electrodes F1 or FC1 (electrodes of interest), then their data were removed from analysis. Primary analysis of the remaining EEG data then involved averaging the signal across the electrodes of interest (or using just electrode F1 or FC1 in case of electrode removal), and calculating the Fourier transform for each trial per participant. These amplitudes were then averaged across trials to give overall results for each participant. Statistical comparisons were then performed on the Fourier amplitudes at the stimulation frequency (26Hz), across conditions and participants. No additional filtering or denoising steps were applied to the EEG data, in line with @figueira2022a report that only a Fourier transform is typically needed for this type of EEG data.
 
-Regarding questionnaire data, scores for both illusion experience questions were combined to give median scores, along with both disownership questions and both control questions, resulting in 3 median scores per condition per participant. The median control scores were used to create an index of the illusion and disownership scores by subtracting the median control score from the median illusion and median disownership scores, in line with previous research doing similarly [@matsumiya2021a; @kilteni2017a; @kalckert2012a]. The normalised (baseline corrected) data were used for analyses, with a new scale from -100 to +100 with 100 indicating strongly agree, 50 indicating a neutral opinion, and scores below 0 indicating strongly disagree with the statements on the questionnaire. 50 is maintained as a neutral opinion so that the normalised data still adhered to the thresholds that the participants were presented with during the experiment. 
+Regarding questionnaire data, scores for both illusion experience questions were combined to give median scores, along with both disownership questions and both control questions, resulting in 3 median scores per condition per participant. The median control scores were used to create an index of the illusion and disownership scores by subtracting the median control score from the median illusion and median disownership scores, in line with previous research doing similarly [@matsumiya2021a; @kilteni2017a; @kalckert2012a; @hansford2024c]. The normalised (baseline corrected) data were used for analyses, with a new scale from -100 to +100 with 100 indicating strongly agree, 50 indicating a neutral opinion, and scores below 0 indicating strongly disagree with the statements on the questionnaire. 50 is maintained as a neutral opinion so that the normalised data still adhered to the thresholds that the participants were presented with during the experiment. 
 
 8 data points were collected per participant for their pain ratings. Median scores were then calculated across pain data for pre and post scores for all experimental conditions.
 
@@ -1880,9 +1923,9 @@ A priori power analysis using G\*Power for the smallest effect size of interest 
 
 ### Hypothesis 2
 
-*There will be a significant difference in SSEP response across the electrodes of interest (F1 & FC1) when comparing (2a) the MS condition to the NI condition, when comparing (2b) the UV condition to the NI condition, but (2c) that there will be no significant difference when comparing the NIT condition to the NI condition.*
+*(2) There will be a significant difference in SSEP response across the electrodes of interest (F1 & FC1) when comparing (2a) the MS condition to the NI condition, when comparing (2b) the UV condition to the NI condition, but (2c) that there will be no significant difference when comparing the NIT condition to the NI condition.*
 
-As mentioned in the EEG pre-processing steps in section 2.4.1, EEG data analysis involved taking a Fourier transform for each waveform averaged across the electrodes of interest, to obtain the amplitude for each trial at the vibration frequency (26Hz). These amplitudes were then averaged across trials to give overall results for each participant, before following preregistered analysis plans (https://osf.io/9anjc). Based on the pilot data in Figure 3, we expected to see activation most pronounced over mid-frontal distributions, covering F1 and FC1 electrodes and therefore these electrodes were selected as the electrodes of interest. 
+As mentioned in the EEG pre-processing steps in section 2.4.1, EEG data analysis involved taking a Fourier transform for each waveform averaged across the electrodes of interest, to obtain the amplitude for each trial at the vibration frequency (26Hz). These amplitudes were then averaged across trials to give overall results for each participant, before following preregistered analysis plans (https://osf.io/9anjc). Based on the pilot data in Figure A1, we expected to see activation most pronounced over mid-frontal distributions, covering F1 and FC1 electrodes and therefore these electrodes were selected as the electrodes of interest. 
 
 Despite our previous work using SSEPs to assess somatosensory response changes during illusory finger stretching, this was the first study to investigate illusory finger stretching using SSEPs in a chronic pain sample, so appropriate effect size estimates were not available. We therefore conducted power calculations based on a smallest effect size of interest, in line with the recommendation of @lakens2014a. Here, we chose an effect size of d = 0.5 (a medium effect, see Cohen, 1988), since this is the smallest effect size we were interested in detecting, which converted to a Cohen’s f of 0.25 for power analyses. 
 
@@ -1900,13 +1943,13 @@ A priori power analysis using G\*Power showed that for a Wilcoxon signed-rank te
 
 # Results
 
-Positive control analyses of the subjective illusion data can be seen in @fig-illusion. A Friedman test found a significant overall effect of condition with a moderate effect size ($\chi^2$(`r round(res.fried_illusion$df[1],digits = 2)`) = `r round(res.fried_illusion$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_illusion$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_illusion$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined illusion score in the Multisensory Stretching (MS) condition (M = `r round(illusionmsds$median[3],digits = 2)`, SD = `r round(illusionmsds$sd[3],digits = 2)`) compared to the Non-Illusion (NI; M = `r round(illusionmsds$median[1],digits = 2)`, SD = `r round(illusionmsds$sd[1],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`) and Non Illusion Tactile (NIT; M = `r round(illusionmsds$median[2],digits = 2)`, SD = `r round(illusionmsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[4], digits = 1, eps = 0.001, nsmall = 3)`) conditions, thereby supporting hypotheses 1a and 1b and fulfilling the positive control checks. Exploratory analysis also showed a significant difference between the MS and Unimodal Visual (UV) condition (M = `r round(illusionmsds$median[4],digits = 2)`, SD = `r round(illusionmsds$sd[4],digits = 2)`, *p* = `r format.pval(nppwc_illusion$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`). 
+Positive control analyses of the subjective illusion data can be seen in @fig-illusion. A Friedman test found a significant overall effect of condition with a moderate effect size ($\chi^2$(`r round(res.fried_illusion$df[1],digits = 2)`) = `r round(res.fried_illusion$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_illusion$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_illusion$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined illusion score in the Multisensory Stretching (MS) condition (Median = `r round(illusionmsds$median[3],digits = 2)`, SD = `r round(illusionmsds$sd[3],digits = 2)`) compared to the Non-Illusion (NI; M = `r round(illusionmsds$median[1],digits = 2)`, SD = `r round(illusionmsds$sd[1],digits = 2)`, *z* = `r round(nppwc_illusion$statistic[2], digits = 2)`, *p.adj* = `r format.pval(nppwc_illusion$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_illusion$estimate[2],digits = 2)`) and Non Illusion Tactile (NIT; Median = `r round(illusionmsds$median[2],digits = 2)`, SD = `r round(illusionmsds$sd[2],digits = 2)`, *z* = `r round(nppwc_illusion$statistic[4], digits = 2)`, *p.adj* = `r format.pval(nppwc_illusion$p.adj[4], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_illusion$estimate[4],digits = 2)`) conditions, thereby supporting hypotheses 1, 1a, and 1b and fulfilling the positive control checks. Exploratory analysis also showed a significant difference between the MS and Unimodal Visual (UV) condition (Median = `r round(illusionmsds$median[4],digits = 2)`, SD = `r round(illusionmsds$sd[4],digits = 2)`, *z* = `r round(nppwc_illusion$statistic[6], digits = 2)`, *p.adj* = `r format.pval(nppwc_illusion$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_illusion$estimate[6],digits = 2)`). 
 
-![Combined Illusion Scores Across Conditions. Scores below 50 indicate disagreement with experience of illusion statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/illusiondata.pdf){#fig-illusion}
+![Combined Illusion Score Index Across Conditions (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual). Scores below 50 indicate disagreement with experience of illusion statements, whilst scores above 50 indicate agreement. A continuous visual analogue scale was used in data collection, with agreement and disagreement statements located at each end of the scale. Box plots show means, medians and inter-quartile ranges of data. Medians are indicated with a horizontal line whilst means are indicated by a black dot. Data points are shown in grey jitter binned along the y-axis, grouped by condition. ](Figures/illusiondata.pdf){#fig-illusion}
 
-Exploratory analysis of subjective disownership and control data can be seen in Appendix B.
+Exploratory analysis of subjective disownership and control data can be seen in Appendix B. A  significant difference in disownership scores was found between the UV condition (Median = `r round(disownershipmsds$median[4],digits = 2)`, SD = `r round(disownershipmsds$sd[4],digits = 2)`) compared to the NI (Median = `r round(disownershipmsds$median[1],digits = 2)`, SD = `r round(disownershipmsds$sd[1],digits = 2)`, , *z* = `r round(nppwc_disownership$statistic[3], digits = 2)`, *p.adj* = `r format.pval(nppwc_disownership$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[3],digits = 2)`), NIT (Median = `r round(disownershipmsds$median[2],digits = 2)`, SD = `r round(disownershipmsds$sd[2],digits = 2)`, *z* = `r round(nppwc_disownership$statistic[5], digits = 2)`, *p.adj* = `r format.pval(nppwc_disownership$p.adj[5], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[5],digits = 2)`), and MS conditions, (Median = `r round(disownershipmsds$median[3],digits = 2)`, SD = `r round(disownershipmsds$sd[3],digits = 2)`, *z* = `r round(nppwc_disownership$statistic[6], digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[6],digits = 2)`). Regarding control data, a significant difference was found between NI (Median = `r round(controlmsds$median[1],digits = 2)`, SD = `r round(controlmsds$sd[1],digits = 2)`) and UV (Median = `r round(controlmsds$median[4],digits = 2)`, SD = `r round(controlmsds$sd[4],digits = 2)`) control scores (*z* = `r round(nppwc_control$statistic[3], digits = 2)`*p.adj* = `r format.pval(nppwc_control$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_control$estimate[3],digits = 2)`). 
 
-Analyses of SSEP data can be seen in @fig-eeg1. The left panel (a) confirms the presence of a clear steady-state signal at 26Hz, which was strongest over fronto-central electrodes. A Friedman test found no significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_eeg1$df[1],digits = 2)`) = `r round(res.fried_eeg1$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_eeg1$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_eeg1$effsize[1],digits = 2)`), opposing Hypothesis 2. Despite the MS condition having numerically the lowest median amplitude (M = `r round(eegdatamsds$median[3],digits = 2)`, SD = `r round(eegdatamsds$sd[3],digits = 2)`), post hoc Wilcoxon tests with Holm corrections found no significant differences between SSEP amplitude when comparing the NI condition (M = `r round(eegdatamsds$median[1],digits = 2)`, SD = `r round(eegdatamsds$sd[1],digits = 2)`) to the MS condition (*p* = `r format.pval(nppwc_eeg1$p.adj[1], digits = 1, eps = 0.001, nsmall = 3)`), or the UV condition (M = `r round(eegdatamsds$median[4],digits = 2)`, SD = `r round(eegdatamsds$sd[4],digits = 2)`, *p* = `r format.pval(nppwc_eeg1$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`), meaning Hypotheses 2a and 2b were unsupported. There was no significant difference found when comparing the NI condition to the NIT condition (M = `r round(eegdatamsds$median[2],digits = 2)`, SD = `r round(eegdatamsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_eeg1$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`), supporting Hypothesis 2c. 
+Analyses of SSEP data can be seen in @fig-eeg1. The left panel (a) confirms the presence of a clear steady-state signal at 26Hz, which was strongest over fronto-central electrodes. A Friedman test found no significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_eeg1$df[1],digits = 2)`) = `r round(res.fried_eeg1$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_eeg1$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_eeg1$effsize[1],digits = 2)`), opposing Hypothesis 2. Despite the MS condition having numerically the lowest median amplitude (Median = `r round(eegdatamsds$median[3],digits = 2)`, SD = `r round(eegdatamsds$sd[3],digits = 2)`), post hoc Wilcoxon tests with Holm corrections found no significant differences between SSEP amplitude when comparing the NI condition (Median = `r round(eegdatamsds$median[1],digits = 2)`, SD = `r round(eegdatamsds$sd[1],digits = 2)`) to the MS condition (*z* = `r round(nppwc_eeg1$statistic[1], digits = 2)`*p.adj* = `r format.pval(nppwc_eeg1$p.adj[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_eeg1$estimate[1],digits = 2)`), or the UV condition (Median = `r round(eegdatamsds$median[4],digits = 2)`, SD = `r round(eegdatamsds$sd[4],digits = 2)`, *z* = `r round(nppwc_eeg1$statistic[2], digits = 2)`, *p.adj* = `r format.pval(nppwc_eeg1$p.adj[2], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_eeg1$estimate[2],digits = 2)`), meaning Hypotheses 2, 2a, and 2b were unsupported. There was no significant difference found when comparing the NI condition to the NIT condition (Median = `r round(eegdatamsds$median[2],digits = 2)`, SD = `r round(eegdatamsds$sd[2],digits = 2)`, *z* = `r round(nppwc_eeg1$statistic[3], digits = 2)`, *p.adj* = `r format.pval(nppwc_eeg1$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_eeg1$estimate[3],digits = 2)`), supporting Hypothesis 2c. 
 
 ::: {#fig-confirmeeg layout-valign="bottom" layout="[[48,-4,48], [100]]"}
 
@@ -1914,14 +1957,14 @@ Analyses of SSEP data can be seen in @fig-eeg1. The left panel (a) confirms the 
 
 ![](Figures/eegdata.pdf){#fig-eeg1}
 
-(a): SSEP Amplitude Spectra Across Conditions for electrodes of interest (F1 & FC1). Shading shows ±1 standard error across participants. (b): SSEP Amplitudes Across Conditions. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter.  
+(a): SSEP Amplitude Spectra Across Conditions (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual) for electrodes of interest (F1 & FC1). Shading shows ±1 standard error across participants (n=46). (b): SSEP Amplitudes Across Conditions. Box plots show means, medians and inter-quartile ranges of data. Medians are indicated with a horizontal line whilst means are indicated by a black dot. Data points are shown in grey jitter binned along the y-axis, grouped by condition. 
 :::
 
-Exploratory correlation analyses were conducted to assess the correlation between participant’s subjective illusion score and their SSEP amplitude across electrodes of interest (F1 & FC1) for each condition to see if those who experienced a stronger feeling of the illusion had more reduced SSEP amplitudes, results showed no significant correlations. Correlations were also run between participants pain percentage change and their SSEP amplitude across conditions, to assess if those experiencing a reduction in pain showed a lower SSEP amplitude, however no significant correlations were found. Finally, correlations were run across conditions comparing participant's pain percentage change data and their subjective illusion scores, also finding no significant correlations. All exploratory correlation analyses can be seen in Appendix C. 
+Exploratory correlation analyses were conducted to assess the correlation between participants' subjective illusion score and their SSEP amplitude across electrodes of interest (F1 & FC1) for each condition to see if those who experienced a stronger feeling of the illusion had more reduced SSEP amplitudes; the results showed no significant correlations. Exploratory correlation analyses and figures can be found in Appendix C. 
 
-Analysis of pain data across conditions can be seen in @fig-pain. Wilcoxon tests found a significant increase in pain when comparing NI pre (M = `r round(NIpainmsds$median[2],digits = 2)`, SD = `r round(NIpainmsds$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds$median[1],digits = 2)`, SD = `r round(NIpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNI$statistic[1],digits = 2)`, *p* = `r format.pval(paintestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`). No significant differences were found when comparing NIT pre (M = `r round(NITpainmsds$median[2],digits = 2)`, SD = `r round(NITpainmsds$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds$median[1],digits = 2)`, SD = `r round(NITpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(paintestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), in line with our hypotheses. No differences in pain were found when comparing the MS pre (M = `r round(MSpainmsds$median[2],digits = 2)`, SD = `r round(MSpainmsds$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds$median[1],digits = 2)`, SD = `r round(MSpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestMS$statistic[1],digits = 2)`, *p* = `r format.pval(paintestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor the UV pre (M = `r round(UVpainmsds$median[2],digits = 2)`, SD = `r round(UVpainmsds$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds$median[1],digits = 2)`, SD = `r round(UVpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestUV$statistic[1],digits = 2)`, *p* = `r format.pval(paintestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`) levels, opposing our hypotheses. 
+Analysis of pain data across conditions can be seen in @fig-pain. Wilcoxon tests found a significant increase in pain when comparing NI pre (Median = `r round(NIpainmsds$median[2],digits = 2)`, SD = `r round(NIpainmsds$sd[2],digits = 2)`) and post (Median = `r round(NIpainmsds$median[1],digits = 2)`, SD = `r round(NIpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNI$statistic[1],digits = 2)`, *p.adj* = `r format.pval(paintestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(paintestNI$estimate[1],digits = 2)`). No significant differences were found when comparing NIT pre (Median = `r round(NITpainmsds$median[2],digits = 2)`, SD = `r round(NITpainmsds$sd[2],digits = 2)`) and post (Median = `r round(NITpainmsds$median[1],digits = 2)`, SD = `r round(NITpainmsds$sd[1],digits = 2)`) pain levels (*z* = `r round(paintestNIT$statistic[1],digits = 2)`, *p.adj* = `r format.pval(paintestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(paintestNIT$estimate[1],digits = 2)`), in line with our hypotheses. No differences in pain were found when comparing the MS pre (Median = `r round(MSpainmsds$median[2],digits = 2)`, SD = `r round(MSpainmsds$sd[2],digits = 2)`) and post (Median = `r round(MSpainmsds$median[1],digits = 2)`, SD = `r round(MSpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestMS$statistic[1],digits = 2)`, *p.adj* = `r format.pval(paintestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(paintestMS$estimate[1],digits = 2)`) nor the UV pre (Median = `r round(UVpainmsds$median[2],digits = 2)`, SD = `r round(UVpainmsds$sd[2],digits = 2)`) and post (Median = `r round(UVpainmsds$median[1],digits = 2)`, SD = `r round(UVpainmsds$sd[1],digits = 2)`) levels (*z* = `r round(paintestUV$statistic[1],digits = 2)`, *p.adj* = `r format.pval(paintestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(paintestUV$estimate[1],digits = 2)`) levels, opposing our hypotheses. 
 
-![Pre and Post Pain Scores Across Conditions. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey. ](Figures/pain.pdf){#fig-pain}
+![Pre and Post Pain Scores Across Conditions. Box plots show means, medians and inter-quartile ranges of data. Medians are indicated with a horizontal line whilst means are indicated by a black dot. Paired data points are shown in grey. ](Figures/pain.pdf){#fig-pain}
 
 Despite finding no significant differences in pain levels for illusory conditions when conducting group level analyses, there were cases of pain reduction for each condition for individual participants. The MS condition resulted in `r num_instances_MSR` participants experiencing a reduction in pain, with `r num_instances_MS30` participants experiencing a reduction greater than 30%, which is described as a clinically meaningful level of pain reduction (Dworkin et al., 2018) and `r num_instances_MS50` greater than 50% (described as extremely meaningful). The UV condition resulted in `r num_instances_UVR` participants experiencing a reduction in pain, `r num_instances_UV30` of which experienced a reduction greater than 30% and `r num_instances_UV50` a reduction greater than 50%. These conditions saw more participants experience reductions in pain levels compared to the non-illusion conditions which saw only `r num_instances_NIR` participants experience a reduction in pain following the NI condition, `r num_instances_NI30` of which experienced a reduction greater than 30% and `r num_instances_NI50` a reduction greater than 50%, and `r num_instances_NITR` participants experience a reduction in pain following the NIT condition, with `r num_instances_NIT30` participants experiencing a reduction greater than 30% and `r num_instances_NIT50` participants experiencing a reduction greater than 50%. 
 
@@ -1929,19 +1972,21 @@ Despite finding no significant differences in pain levels for illusory condition
 
 ![Percentage change for pain scores across all conditions per participant. Dashed lines show 30% pain reduction (clinically meaningful) and 50% pain reduction (extremely meaningful).](Figures/pain_exp.pdf){#fig-painexp}
 
-To assess if participants experiencing a reduction in pain differed between presentations of chronic primary and secondary pain conditions, data were analysed split by condition type and can be found in the Appendix D. No significant differences were found when comparing pre and post pain levels across any condition for either chronic primary or secondary pain. 
+To assess if participants experiencing a reduction in pain differed between presentations of chronic primary and secondary pain conditions, data were analysed split by condition type and can be found in Appendix D. No significant differences were found when comparing pre and post pain levels across any condition for either chronic primary or secondary pain. 
+
+Exploratory correlations were also run between participants' pain percentage change and their SSEP amplitude across conditions, to assess if those experiencing a reduction in pain showed a lower SSEP amplitude, however no significant correlations were found. Further exploratory correlations were run across conditions comparing participants' pain percentage change data and their subjective illusion scores, also finding no significant correlations. All exploratory correlation analyses can be seen in Appendix C. 
 
 # Discussion
 
 This study investigated subjective illusory experience and neural response to resizing illusions in participants with chronic hand-based pain to assess whether illusory resizing of the fingers would reduce pain levels and show differences in steady state responses to 26Hz vibrotactile stimulation across illusory conditions. Subjective results replicated previous findings in samples without chronic pain of a significantly greater experience of the illusion in the multisensory condition compared to both non-illusion conditions, with the unimodal visual condition showing a wider range of illusory experience responses. SSEP responses to 26Hz vibrotactile stimulation showed no significant differences in response amplitude across conditions opposing our hypothesis, with pain ratings also showing no significant differences when comparing pre and post levels for both illusory conditions, contrasting previous analgesic findings. 
 
-Our work delivering resizing illusions to participants without chronic pain [@hansford2024c], showed surprising effects of a significantly greater experience of the illusion in the multisensory condition compared to the unimodal visual condition, despite previous findings of visual capture alone being found to elicit embodiment in both virtual [@maselli2013a] and physical environments [@carey2019a], and when viewing an illusion of an elongated arm [@schaefer2007a] or from visual-only manipulations of the hand [@mckenzie2015a]. Previously, we found significantly greater levels of disownership during unimodal conditions compared to multisensory conditions and therefore posited that the tactile input of touching the hand / finger is needed to ground one’s experience of owning their body part within augmented reality. The present study replicated these findings of significantly heightened disownership levels during the unimodal visual conditions, further supporting the idea that tactile input grounding one’s experience could contribute to greater experiences of illusory stretching, regardless of the presence of a chronic pain condition. 
+Our work delivering resizing illusions to participants without chronic pain [@hansford2024c], showed surprising effects of a significantly greater experience of the illusion in the multisensory condition compared to the unimodal visual condition, despite previous findings of visual capture alone being found to elicit embodiment in both virtual [@maselli2013a] and physical environments [@carey2019a], and when viewing an illusion of an elongated arm [@schaefer2007a] or from visual-only manipulations of the hand [@mckenzie2015a]. Previously, we found significantly greater levels of disownership during unimodal visual conditions compared to multisensory conditions and therefore posited that the tactile input of touching the hand / finger is needed to ground one’s experience of owning their body part within augmented reality. The present study replicated these findings of significantly heightened disownership levels during the unimodal visual condition, further supporting the idea that tactile input grounding one’s experience could contribute to greater experiences of illusory stretching, regardless of the presence of a chronic pain condition. Previous commentary regarding experiences of illusory analgesia raises the idea that a reduction in pain following illusory resizing could be due to disownership of the painful body part, which could thereby inhibit its incoming sensory signals including pain [@mccabe2011a]. Research using the disappearing hand trick [@preston2020a], see paper for explanation), attempted to address this concern regarding illusory analgesia being the result of disownership, highlighting that the analgesia experienced following the manipulation could not result from disownership of the hand. The present study provides the first empirical evidence that people with hand-based chronic pain subjectively report experiencing resizing illusions whilst showing comparatively low levels of disownership in the multisensory condition, further supporting the idea that illusory analgesia is not the result of limb disownership.  
 
 The somatosensory blurring hypothesis [@haggard2013a] posits that the cortical representation of a painful body part could be blurred and through viewing the body part the representation could become sharpened, which could be the mechanism through which illusory stretching could induce illusory analgesia. Slight reductions in SSEP amplitude have been found before in participants without chronic pain undergoing hand-based resizing illusions [@hansford2024c], however since these participants did not experience chronic pain in their hands it was thought that their cortical representations might not be as blurred as those with chronic hand-based pain such as in the present study. Since no significant difference in SSEP response across resizing conditions were found, it is possible that illusory analgesia could be driven from an alternate mechanism. However, no significant differences in pain levels were found across illusory conditions, meaning SSEP amplitude reductions might not have been expected due to no observed group level illusory analgesia. Since some participants did experience illusory analgesia, exploratory correlations were run between participant’s pain percentage change and their SSEP response, to assess whether those experiencing a pain reduction had reduced SSEP amplitudes, however no significant correlations were found.
 
 It is possible that the lack of illusory analgesia seen across participants in the present study was due to the experimental set up. A significant increase in pain was found when comparing pain ratings before and after the non-illusion condition, with some participants commenting that during participation having their hand inside the augmented reality system was painful for their wrist and shoulder, meaning that they found it difficult to differentiate the pain they were experiencing from the set up itself compared to pain in their manipulated digit. Additionally, participants reported that the need to sit still for 5 minutes per condition block resulted in some additional pain which although reduced through rest breaks between blocks, could have influenced pain ratings taken immediately after a condition. 
 
-It is possible that the vibration elicited during each condition could have reduced participant’s pain through a process referred to as vibratory analgesia. Some studies have found vibration to produce up to a 40% reduction in pain intensity [@staud2011a], whereas others report no significant effects of vibration on pain levels [@watanabe1999a]. Due to the therapeutic potential of vibratory analgesia, vibrating gloves have been created as a therapeutic option for people with chronic hand-based pain and have been found to effectively reduce pain levels [@jamison2018a]. Within the present study, it is therefore possible that the 26Hz vibration could have reduced pain levels through vibratory analgesia, however, since vibration was present across all conditions and more participants reported pain reductions in the illusory conditions compared to the non-illusion conditions, it is clear that there were illusory analgesic effects observed beyond that induced by vibratory analgesia. 
+It is also possible that the vibration elicited during each condition could have reduced participants' pain through a process referred to as vibratory analgesia. Some studies have found vibration to produce up to a 40% reduction in pain intensity [@staud2011a], whereas others report no significant effects of vibration on pain levels [@watanabe1999a]. Due to the therapeutic potential of vibratory analgesia, vibrating gloves have been created as a therapeutic option for people with chronic hand-based pain and have been found to effectively reduce pain levels [@jamison2018a]. Within the present study, it is therefore possible that the 26Hz vibration could have reduced pain levels through vibratory analgesia, however, since vibration was present across all conditions and more participants reported pain reductions in the illusory conditions compared to the non-illusion conditions, it is clear that there were illusory analgesic effects observed beyond that induced by vibratory analgesia. 
 
 Although pain data analyses were conducted at the group level as preregistered, it is important to understand the individual experiences of participants within this sample. Simply because no overall reduction in pain levels were found following either resizing condition (MS or UV), this should not discount the illusory analgesia experiences that several participants reported. Figure 6 shows that a substantial proportion of participants experienced either a clinically or extremely meaningful level of pain reduction following these conditions, highlighting the potential of this therapy for day-to-day treatment. Similarly, however, those experiencing an increase in pain level should not be ignored, and It is therefore recommended that should illusory resizing be offered as a treatment for chronic hand-based pain, that it is not provided within a lab setting such as the current study, where significant increases in pain were found due to the experimental set up. Future research should assess the potential of mobile phone based illusory resizing, so that it can be delivered from the comfort of one’s home. Illusory resizing delivered through a mobile phone would not be able to deliver visuotactile illusions such as the one delivered in the multisensory condition here but could deliver unimodal visual or visual-auditory manipulations. Visual-auditory resizing illusions using a rising pitch tone as non-naturalistic auditory input have been found to increase illusory experiences compared to visual only manipulations [@hansford2023a], therefore both unimodal visual and visual-auditory presentations could be used to deliver meaningful analgesia for a substantial proportion of people living with chronic hand-based pain. 
 
@@ -1955,35 +2000,34 @@ The present study adds to our understanding of the experiences of illusory resiz
 
 # Pilot Data
 
-Previous literature stated that the ideal vibration frequency to use to elicit somatosensory SSEPs is approximately 26Hz (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016; Snyder, 1992).  Due to resizing illusions often manipulating the index finger, and previous studies using the index finger supporting around 26Hz as an optimal frequency (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016), it was hypothesised that 26Hz would elicit a dependable somatosensory SSEP response. Therefore, we ran a pilot study to check that our setup and equipment can reliably elicit and record a somatosensory SSEP at 26Hz, using the resizing illusion and EEG.
+Previous literature stated that the ideal vibration frequency to use to elicit somatosensory SSEPs is approximately 26Hz (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016; Snyder, 1992).  Due to resizing illusions often manipulating the index finger, and previous studies using the index finger supporting around 26Hz as an optimal frequency (Muller et al., 2001; Breitweiser et al., 2016; Pokorny et al., 2016), it was hypothesised that 26Hz would elicit a dependable somatosensory SSEP response. Therefore, we ran a pilot study to check that our setup and equipment could reliably elicit and record an SSEP at 26Hz, using the resizing illusion and EEG.
 
-Pilot data were collected for 3 healthy participants. Participants underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, minus the subjective illusory experience questionnaire. A Fourier transform was calculated for each waveform at each electrode for all conditions, and then averaged across repetition to obtain individual results. These were then averaged across all 3 participants to give the result seen in Figure 8. 
+Pilot data were collected for 3 healthy participants. Participants underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, minus the subjective illusory experience questionnaire. A Fourier transform was calculated for each waveform at each electrode for all conditions, and then averaged across repetition to obtain individual results. These were then averaged across all 3 participants to give the result seen in Figure A1. 
 
-As can be seen in Figure 8, there was a clear somatosensory SSEP response at 26Hz, which was strongest around electrodes F1 and FC1. Previous research using vibrotactile stimulation at 21Hz have also found the scalp topography of the activation to be most pronounced over mid-frontal distributions (Porcu et al., 2014; Timora & Budd, 2018), in line with the scalp topography seen here. Given these finding of a distinct 26Hz signal and mid-frontal scalp location, it appeared appropriate for 26Hz to be used as the vibration frequency in the current study. 
+As can be seen, there is a clear SSEP response at 26Hz, which is strongest around electrodes F1 and FC1. Previous research using vibrotactile stimulation at 21Hz have also found the scalp topography of the activation to be most pronounced over mid-frontal distributions (Porcu et al., 2014; Timora & Budd, 2018), in line with the scalp topography seen here. Given the finding of a distinct 26Hz signal and mid-frontal scalp location, it appeared appropriate for 26Hz to be used as the vibration frequency in the current study. 
 
-![Averaged Pilot Data showing peak frequency at 26Hz, centred between electrodes F1 and FC1. The spectrum is derived from electrode FC1. Saturation bar represents signal to noise ratio (SNR).](Figures/Pilot Data 2.png){width=50%, height=50%}
+![Averaged Pilot Data showing peak frequency at 26Hz, centred between electrodes F1 and FC1. The spectrum is derived from electrode FC1. Saturation bar represents signal to noise ratio (SNR). SNR is a measure of signal quality and describes the ratio of signal power (at 26Hz) to noise power (averaged across 10 adjacent frequency bins). SNR was used for the pilot figure because with a small sample (3 participants) we did not want a noisy electrode to influence the electrodes chosen as electrodes of interest.](Figures/Pilot Data 2.png){width=50%, height=50%}
 
 {{< pagebreak >}}
 
-Pilot data were also collected using the vibrotactile stimulator at 26Hz to make sure that the illusory experience is not affected by the addition of vibrotactile input. Pilot data were collected from 4 additional healthy participants, who underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, but without EEG caps fitted. Illusory experience was calculated using the median of both illusion scores for each participant minus their median control scores, as per the preprocessing steps regarding the control index, and then the data were averaged over participants to give the results seen in Figure 9. As can be seen, there is a greater subjective experience of the resizing illusion, indexed by participant’s illusion score, in both experimental conditions (UV average = 64.25; MS average = 67.88) compared to both control conditions (NI average = 32.38; NIT average = 24.13). Scores below 50 are indicative of disagreement of experience of the illusion, whilst a score of 50 is a neutral option regarding the illusion experience, and scores above 50 are indicative of agreement of experiencing the illusion. This therefore shows that the experience of illusory resizing was maintained when vibrotactile stimulation was added to the procedure and can therefore be used in the current study to elicit somatosensory SSEPs without affecting the subjective illusory experience of the resizing illusion. 
+Pilot data were also collected using the vibrotactile stimulator at 26Hz to make sure that the illusory experience is not affected by the addition of vibrotactile input. Pilot data were collected from 4 additional healthy participants, who underwent the same experimental protocol as mentioned in the “Experimental Procedure” section, but without EEG caps fitted. Illusory experience was calculated using the median of both illusion scores for each participant minus their median control scores, as per the preprocessing steps regarding the control index, and then the data were averaged over participants to give the results seen in Figure A2. As can be seen, there is a greater subjective experience of the resizing illusion, indexed by participant’s illusion score, in both experimental conditions (UV average = 64.25; MS average = 67.88) compared to both control conditions (NI average = 32.38; NIT average = 24.13). Scores below 50 are indicative of disagreement of experience of the illusion, whilst a score of 50 is a neutral option regarding the illusion experience, and scores above 50 are indicative of agreement of experiencing the illusion. This therefore shows that the experience of illusory resizing was maintained when vibrotactile stimulation was added to the procedure and can therefore be used in the current study to elicit somatosensory SSEPs without affecting the subjective illusory experience of the resizing illusion. 
 
 ![Averaged Illusion score for each condition. Error bars represent standard errors. NI represents the non-Illusion condition, NIT refers to the non-illusion tactile condition, UV refers to the unimodal-visual condition, and MS refers to the multisensory condition.](Figures/Pilot Data 3.png){#fig-pilot3}
-
 {{< pagebreak >}}
 
 # Appendix B
 
 # Subjecitve Disownership and Control Analyses:
 
-Exploratory analyses of the subjective disownership data using a Friedman test found a significant overall effect of condition with a small to moderate effect size ($\chi^2$(`r round(res.fried_disownership$df[1],digits = 2)`) = `r round(res.fried_disownership$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_disownership$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_disownership$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined disownership score in the UV condition (M = `r round(disownershipmsds$median[4],digits = 2)`, SD = `r round(disownershipmsds$sd[4],digits = 2)`) compared to the NI (M = `r round(disownershipmsds$median[1],digits = 2)`, SD = `r round(disownershipmsds$sd[1],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`), NIT (M = `r round(disownershipmsds$median[2],digits = 2)`, SD = `r round(disownershipmsds$sd[2],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[5], digits = 1, eps = 0.001, nsmall = 3)`), and MS conditions, (M = `r round(disownershipmsds$median[3],digits = 2)`, SD = `r round(disownershipmsds$sd[3],digits = 2)`, *p* = `r format.pval(nppwc_disownership$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`).
+Exploratory analyses of the subjective disownership data using a Friedman test found a significant overall effect of condition with a small to moderate effect size ($\chi^2$(`r round(res.fried_disownership$df[1],digits = 2)`) = `r round(res.fried_disownership$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_disownership$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_disownership$effsize[1],digits = 2)`) and post hoc Wilcoxon tests with Holm corrections found significantly greater combined disownership score in the UV condition (Median = `r round(disownershipmsds$median[4],digits = 2)`, SD = `r round(disownershipmsds$sd[4],digits = 2)`) compared to the NI (Median = `r round(disownershipmsds$median[1],digits = 2)`, SD = `r round(disownershipmsds$sd[1],digits = 2)`, *z* = `r round(nppwc_disownership$statistic[3],digits = 2)`, *p.adj* = `r format.pval(nppwc_disownership$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[3],digits = 2)`), NIT (Median = `r round(disownershipmsds$median[2],digits = 2)`, SD = `r round(disownershipmsds$sd[2],digits = 2)`, *z* = `r round(nppwc_disownership$statistic[5],digits = 2)`,*p.adj* = `r format.pval(nppwc_disownership$p.adj[5], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[5],digits = 2)`), and MS conditions, (Median = `r round(disownershipmsds$median[3],digits = 2)`, SD = `r round(disownershipmsds$sd[3],digits = 2)`, *z* = `r round(nppwc_disownership$statistic[6],digits = 2)`,*p.adj* = `r format.pval(nppwc_disownership$p.adj[6], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_disownership$estimate[6],digits = 2)`).
 
-![Combined Disownership Scores Across Conditions. Scores below 50 indicate disagreement with experience of disownership statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/disownershipdata.pdf){#fig-disownership}
+![Combined Disownership Score Index Across Conditions (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual). Scores below 50 indicate disagreement with experience of disownership statements, whilst scores above 50 indicate agreement. A continuous visual analogue scale was used in data collection, with agreement and disagreement statements located at each end of the scale. Box plots show means, medians and inter-quartile ranges of data. Medians are indicated with a horizontal line whilst means are indicated by a black dot. Data points are shown in grey jitter binned along the y-axis, grouped by condition. ](Figures/disownershipdata.pdf){#fig-disownership}
 
 {{< pagebreak >}}
 
-Exploratory analyses of the subjective control data using a Friedman test found a significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_control$df[1],digits = 2)`) = `r round(res.fried_control$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_control$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_control$effsize[1],digits = 2)`). Post hoc Wilcoxon tests with Holm corrections for multiple comparisons found a significant difference between NI and UV control scores (*p* = `r format.pval(nppwc_control$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`) however found no significant differences between control scores across any other condition: NI (M = `r round(controlmsds$median[1],digits = 2)`, SD = `r round(controlmsds$sd[1],digits = 2)`), NIT (M = `r round(controlmsds$median[2],digits = 2)`, SD = `r round(controlmsds$sd[2],digits = 2)`), MS (M = `r round(controlmsds$median[3],digits = 2)`, SD = `r round(controlmsds$sd[3],digits = 2)`), UV (M = `r round(controlmsds$median[4],digits = 2)`, SD = `r round(controlmsds$sd[4],digits = 2)`).
+Exploratory analyses of the subjective control data using a Friedman test found a significant overall effect of condition with a small effect size ($\chi^2$(`r round(res.fried_control$df[1],digits = 2)`) = `r round(res.fried_control$statistic[1],digits = 2)`, *p* = `r format.pval(res.fried_control$p[1], digits = 1, eps = 0.001, nsmall = 3)`, Kendall’s W = `r round(effectsize_control$effsize[1],digits = 2)`). Post hoc Wilcoxon tests with Holm corrections for multiple comparisons found a significant difference between NI and UV control scores (*z* = `r round(nppwc_control$statistic[3],digits = 2)`, *p.adj* = `r format.pval(nppwc_control$p.adj[3], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(nppwc_control$estimate[3],digits = 2)`) however found no significant differences between control scores across any other condition: NI (Median = `r round(controlmsds$median[1],digits = 2)`, SD = `r round(controlmsds$sd[1],digits = 2)`), NIT (Median = `r round(controlmsds$median[2],digits = 2)`, SD = `r round(controlmsds$sd[2],digits = 2)`), MS (M = `r round(controlmsds$median[3],digits = 2)`, SD = `r round(controlmsds$sd[3],digits = 2)`), UV (Median = `r round(controlmsds$median[4],digits = 2)`, SD = `r round(controlmsds$sd[4],digits = 2)`).
 
-![Combined Control Scores Across Conditions. Scores below 50 indicate disagreement with experience of control statements, whilst scores above 50 indicate agreement. Box plots show medians and inter-quartile ranges of data. Data points are shown in grey jitter. ](Figures/controldata.pdf){#fig-control}
+![Combined Control Scores Across Conditions (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual). Scores below 50 indicate disagreement with experience of control statements, whilst scores above 50 indicate agreement. A continuous visual analogue scale was used in data collection, with agreement and disagreement statements located at each end of the scale. Box plots show means, medians and inter-quartile ranges of data. Medians are indicated with a horizontal line whilst means are indicated by a black dot. Data points are shown in grey jitter binned along the y-axis, grouped by condition. ](Figures/controldata.pdf){#fig-control}
 
 {{< pagebreak >}}
 
@@ -1991,13 +2035,13 @@ Exploratory analyses of the subjective control data using a Friedman test found 
 
 # Correlation Analyses:
 
-Spearman’s correlations were run to identify any correlations between (1) participant’s illusion score and their SSEP amplitude, (2) participant's pain percentage change and their SSEP amplitude, and (3) participant's subjective illusion scores and their pain percentage change, finding no significant correlations across any analyses.
+Spearman’s correlations were calculated to identify any correlations between (1) participant's illusion score and their SSEP amplitude, (2) participants' pain percentage change and their SSEP amplitude, and (3) participants' subjective illusion scores and their pain percentage change, finding no significant correlations across any analyses.
 
-![Correlation Between Amplitude and Subjective Illusory Score for Each Condition.](Figures/correlationdata.pdf){#fig-correlation}
+![Correlation Between Amplitude and Subjective Illusory Score for Each Condition (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual).](Figures/correlationdata.pdf){#fig-correlation}
 
-![Correlation Between Amplitude and Pain Percentage Change for Each Condition.](Figures/correlationdata2.pdf){#fig-correlation2}
+![Correlation Between Amplitude and Pain Percentage Change for Each Condition (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual).](Figures/correlationdata2.pdf){#fig-correlation2}
 
-![Correlation Between Pain Percentage Change and Subjective Illusory Score for Each Condition.](Figures/correlationdata3.pdf){#fig-correlation3}
+![Correlation Between Pain Percentage Change and Subjective Illusory Score for Each Condition (NI: Non-Illusion; NIT: Non-Illusion Tactile; MS: Multisensory; UV: Unimodal Visual).](Figures/correlationdata3.pdf){#fig-correlation3}
 
 {{< pagebreak >}}
 
@@ -2007,11 +2051,11 @@ Spearman’s correlations were run to identify any correlations between (1) part
 
 Since this sample consisted of participants with both primary and secondary chronic pain conditions, data were analysed split by either primary or secondary pain condition and can be seen in the figures below. Chronic primary pain is plotted in magenta, chronic secondary pain is plotted in green, and participants with either no diagnosis or a mix of primary and secondary pain conditions are plotted in grey.
 
-Regarding chronic primary pain conditions, Wilcoxon tests found no significant differences when comparing NI pre (M = `r round(NIpainmsds1$median[2],digits = 2)`, SD = `r round(NIpainmsds1$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds1$median[1],digits = 2)`, SD = `r round(NIpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNI$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`), nor when comparing NIT pre (M = `r round(NITpainmsds1$median[2],digits = 2)`, SD = `r round(NITpainmsds1$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds1$median[1],digits = 2)`, SD = `r round(NITpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), MS pre (M = `r round(MSpainmsds1$median[2],digits = 2)`, SD = `r round(MSpainmsds1$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds1$median[1],digits = 2)`, SD = `r round(MSpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestMS$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor UV pre (M = `r round(UVpainmsds1$median[2],digits = 2)`, SD = `r round(UVpainmsds1$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds1$median[1],digits = 2)`, SD = `r round(UVpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestUV$statistic[1],digits = 2)`, *p* = `r format.pval(primarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`).
+Regarding chronic primary pain conditions, Wilcoxon tests found no significant differences when comparing NI pre (Median = `r round(NIpainmsds1$median[2],digits = 2)`, SD = `r round(NIpainmsds1$sd[2],digits = 2)`) and post (Median = `r round(NIpainmsds1$median[1],digits = 2)`, SD = `r round(NIpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNI$statistic[1],digits = 2)`, *p.adj* = `r format.pval(primarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(primarytestNI$estimate[1],digits = 2)`), nor when comparing NIT pre (Median = `r round(NITpainmsds1$median[2],digits = 2)`, SD = `r round(NITpainmsds1$sd[2],digits = 2)`) and post (Median = `r round(NITpainmsds1$median[1],digits = 2)`, SD = `r round(NITpainmsds1$sd[1],digits = 2)`) pain levels (*z* = `r round(primarytestNIT$statistic[1],digits = 2)`, *p.adj* = `r format.pval(primarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(primarytestNIT$estimate[1],digits = 2)`), MS pre (Median = `r round(MSpainmsds1$median[2],digits = 2)`, SD = `r round(MSpainmsds1$sd[2],digits = 2)`) and post (Median = `r round(MSpainmsds1$median[1],digits = 2)`, SD = `r round(MSpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestMS$statistic[1],digits = 2)`, *p.adj* = `r format.pval(primarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(primarytestMS$estimate[1],digits = 2)`) nor UV pre (Median = `r round(UVpainmsds1$median[2],digits = 2)`, SD = `r round(UVpainmsds1$sd[2],digits = 2)`) and post (Median = `r round(UVpainmsds1$median[1],digits = 2)`, SD = `r round(UVpainmsds1$sd[1],digits = 2)`) levels (*z* = `r round(primarytestUV$statistic[1],digits = 2)`, *p.adj* = `r format.pval(primarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(primarytestUV$estimate[1],digits = 2)`).
 
 ![Pre and Post Pain Scores Across Conditions for Participants with Chronic Primary Pain. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey.](Figures/pain_cond1.pdf){#fig-painc1}
 
-No differences in pain levels were found for chronic secondary pain conditions when comparing NI pre (M = `r round(NIpainmsds2$median[2],digits = 2)`, SD = `r round(NIpainmsds2$sd[2],digits = 2)`) and post (M = `r round(NIpainmsds2$median[1],digits = 2)`, SD = `r round(NIpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNI$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`), nor when comparing NIT pre (M = `r round(NITpainmsds2$median[2],digits = 2)`, SD = `r round(NITpainmsds2$sd[2],digits = 2)`) and post (M = `r round(NITpainmsds2$median[1],digits = 2)`, SD = `r round(NITpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNIT$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`), MS pre (M = `r round(MSpainmsds2$median[2],digits = 2)`, SD = `r round(MSpainmsds2$sd[2],digits = 2)`) and post (M = `r round(MSpainmsds2$median[1],digits = 2)`, SD = `r round(MSpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestMS$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`) nor UV pre (M = `r round(UVpainmsds2$median[2],digits = 2)`, SD = `r round(UVpainmsds2$sd[2],digits = 2)`) and post (M = `r round(UVpainmsds2$median[1],digits = 2)`, SD = `r round(UVpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestUV$statistic[1],digits = 2)`, *p* = `r format.pval(secondarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`).
+No differences in pain levels were found for chronic secondary pain conditions when comparing NI pre (Median = `r round(NIpainmsds2$median[2],digits = 2)`, SD = `r round(NIpainmsds2$sd[2],digits = 2)`) and post (Median = `r round(NIpainmsds2$median[1],digits = 2)`, SD = `r round(NIpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNI$statistic[1],digits = 2)`, *p.adj* = `r format.pval(secondarytestNI$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(secondarytestNI$statistic[1],digits = 2)`), nor when comparing NIT pre (Median = `r round(NITpainmsds2$median[2],digits = 2)`, SD = `r round(NITpainmsds2$sd[2],digits = 2)`) and post (Median = `r round(NITpainmsds2$median[1],digits = 2)`, SD = `r round(NITpainmsds2$sd[1],digits = 2)`) pain levels (*z* = `r round(secondarytestNIT$statistic[1],digits = 2)`, *p.adj* = `r format.pval(secondarytestNIT$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(secondarytestNIT$statistic[1],digits = 2)`), MS pre (Median = `r round(MSpainmsds2$median[2],digits = 2)`, SD = `r round(MSpainmsds2$sd[2],digits = 2)`) and post (Median = `r round(MSpainmsds2$median[1],digits = 2)`, SD = `r round(MSpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestMS$statistic[1],digits = 2)`, *p.adj* = `r format.pval(secondarytestMS$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(secondarytestMS$statistic[1],digits = 2)`) nor UV pre (Median = `r round(UVpainmsds2$median[2],digits = 2)`, SD = `r round(UVpainmsds2$sd[2],digits = 2)`) and post (Median = `r round(UVpainmsds2$median[1],digits = 2)`, SD = `r round(UVpainmsds2$sd[1],digits = 2)`) levels (*z* = `r round(secondarytestUV$statistic[1],digits = 2)`, *p.adj* = `r format.pval(secondarytestUV$p[1], digits = 1, eps = 0.001, nsmall = 3)`, r = `r round(secondarytestUV$statistic[1],digits = 2)`).
 
 ![Pre and Post Pain Scores Across Conditions for Participanta with Chronic Secondary Pain. Box plots show medians and inter-quartile ranges of data. Paired data points are shown in grey.](Figures/pain_cond2.pdf){#fig-painc2}
 
@@ -2019,4 +2063,3 @@ No differences in pain levels were found for chronic secondary pain conditions w
 
 
 # References
-
